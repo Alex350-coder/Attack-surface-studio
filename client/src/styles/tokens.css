@@ -1,0 +1,155 @@
+/* Design tokens for Attack Surface Studio — dark, premium SaaS surface. */
+
+:root {
+  /* Surface */
+  --color-background: oklch(9% 0.014 264);
+  --color-background-elevated: oklch(12.5% 0.017 264);
+  --color-surface: oklch(16% 0.02 264);
+  --color-surface-hover: oklch(20% 0.022 264);
+  --color-border: oklch(32% 0.02 264 / 0.5);
+  --color-border-strong: oklch(46% 0.02 264 / 0.7);
+
+  /* Text */
+  --color-foreground: oklch(96% 0.004 264);
+  --color-foreground-muted: oklch(72% 0.01 264);
+  --color-foreground-subtle: oklch(52% 0.012 264);
+
+  /* Brand accent */
+  --color-accent: oklch(65% 0.19 288);
+  --color-accent-strong: oklch(72% 0.2 288);
+  --color-accent-soft: oklch(65% 0.19 288 / 0.14);
+
+  /* Node category colors (consumed by nodeTypeRegistry via colorToken) */
+  --node-infrastructure: oklch(72% 0.13 232);
+  --node-finding: oklch(75% 0.15 70);
+  --node-critical: oklch(63% 0.22 22);
+  --node-evidence: oklch(70% 0.14 300);
+  --node-artifact: oklch(66% 0.012 264);
+  --node-intelligence: oklch(72% 0.19 330);
+
+  /* Edge colors (consumed by edgeTypeRegistry via colorToken) */
+  --edge-discovery: oklch(72% 0.13 232);
+  --edge-relationship: oklch(52% 0.018 264);
+  --edge-evidence: oklch(70% 0.14 300);
+  --edge-risk: oklch(72% 0.17 45);
+  --edge-ai: oklch(72% 0.19 330);
+
+  /* Motion */
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+  --duration-slow: 600ms;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Typography scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.0625rem);
+  --text-lg: clamp(1.125rem, 1.05rem + 0.35vw, 1.25rem);
+  --text-xl: clamp(1.375rem, 1.2rem + 0.6vw, 1.75rem);
+  --text-2xl: clamp(1.75rem, 1.4rem + 1.2vw, 2.5rem);
+  --text-hero: clamp(2.75rem, 1.8rem + 4vw, 5.5rem);
+
+  /* Spacing */
+  --space-section: clamp(4rem, 3rem + 5vw, 8rem);
+
+  /* Radius */
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+
+  /* Atmosphere */
+  --glow-primary: oklch(65% 0.19 288 / 0.35);
+  --glow-secondary: oklch(70% 0.14 232 / 0.22);
+  --glow-tertiary: oklch(68% 0.16 330 / 0.16);
+  --grid-line: oklch(96% 0.004 264 / 0.04);
+}
+
+@keyframes node-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--glow-color);
+    opacity: 1;
+  }
+  100% {
+    box-shadow: 0 0 0 26px transparent;
+    opacity: 0;
+  }
+}
+
+.animate-node-pulse {
+  animation: node-pulse 900ms var(--ease-out-expo);
+}
+
+@keyframes edge-flow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.graph-edge-flow {
+  stroke-dasharray: 6 4;
+  animation: edge-flow 1s linear infinite;
+}
+
+@keyframes node-drift {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate(var(--drift-x), var(--drift-y)) rotate(0.6deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+
+.node-drift {
+  animation: node-drift var(--drift-duration, 8000ms) var(--drift-delay, 0ms) ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes node-materialize {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.node-materialize {
+  animation: node-materialize 550ms var(--ease-out-expo) both;
+}
+
+@keyframes edge-grow {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.edge-grow {
+  stroke-dasharray: 1;
+  animation: edge-grow 500ms var(--ease-out-expo) both;
+}
+
+.graph-edge-packet {
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-node-pulse,
+  .graph-edge-flow,
+  .node-drift,
+  .node-materialize,
+  .edge-grow {
+    animation: none;
+  }
+}
