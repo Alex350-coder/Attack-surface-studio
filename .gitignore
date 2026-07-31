@@ -1,0 +1,31 @@
+# Environments
+.env
+.env.local
+*.env
+!*.env.example
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.next/
+out/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+*.pem
+.vscode/
+.idea/
+
+# TypeScript
+*.tsbuildinfo
+
+# Claude Code local tooling artifacts (not project content)
+.claude/
