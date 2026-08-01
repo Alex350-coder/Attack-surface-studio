@@ -1,0 +1,106 @@
+import { and, eq, isNull, sql } from "drizzle-orm";
+import type { Database } from "../../../core/database/client";
+import { projects } from "../../../core/database/schema";
+import { projectScopeSchema, type ProjectScope } from "./project-scope.schema";
+import {
+  extractTotal,
+  normalizePagination,
+  type Paginated,
+  type PaginationParams,
+} from "../../shared/repository.types";
+
+export interface ProjectRow {
+  id: string;
+  name: string;
+  slug: string;
+  scope: ProjectScope;
+  createdBy: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+}
+
+export interface ProjectCreateInput {
+  name: string;
+  slug: string;
+  scope?: ProjectScope;
+  createdBy?: string | null;
+}
+
+/**
+ * All data access for the `projects` table. `scope` is validated with Zod before every
+ * write (BE-*, SEC boundary validation) since it drives tool-execution authorization.
+ */
+export interface ProjectsRepository {
+  create(input: ProjectCreateInput): Promise<ProjectRow>;
+  updateScope(id: string, scope: ProjectScope): Promise<ProjectRow | null>;
+  findById(id: string): Promise<ProjectRow | null>;
+  findBySlug(slug: string): Promise<ProjectRow | null>;
+  list(pagination?: PaginationParams): Promise<Paginated<ProjectRow>>;
+  softDelete(id: string): Promise<void>;
+}
+
+export class DrizzleProjectsRepository implements ProjectsRepository {
+  constructor(private readonly db: Database) {}
+
+  async create(input: ProjectCreateInput): Promise<ProjectRow> {
+    const scope = projectScopeSchema.parse(input.scope ?? {});
+    const [row] = await this.db
+      .insert(projects)
+      .values({
+        name: input.name,
+        slug: input.slug,
+        scope,
+        createdBy: input.createdBy ?? null,
+      })
+      .returning();
+    return row as ProjectRow;
+  }
+
+  async updateScope(id: string, scope: ProjectScope): Promise<ProjectRow | null> {
+    const validScope = projectScopeSchema.parse(scope);
+    const [row] = await this.db
+      .update(projects)
+      .set({ scope: validScope, updatedAt: sql`now()` })
+      .where(eq(projects.id, id))
+      .returning();
+    return (row as ProjectRow) ?? null;
+  }
+
+  async findById(id: string): Promise<ProjectRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(projects)
+      .where(and(eq(projects.id, id), isNull(projects.deletedAt)))
+      .limit(1);
+    return (row as ProjectRow) ?? null;
+  }
+
+  async findBySlug(slug: string): Promise<ProjectRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(projects)
+      .where(and(eq(projects.slug, slug), isNull(projects.deletedAt)))
+      .limit(1);
+    return (row as ProjectRow) ?? null;
+  }
+
+  async list(pagination?: PaginationParams): Promise<Paginated<ProjectRow>> {
+    const { page, pageSize, offset } = normalizePagination(pagination);
+    const where = isNull(projects.deletedAt);
+
+    const [items, countRows] = await Promise.all([
+      this.db.select().from(projects).where(where).limit(pageSize).offset(offset),
+      this.db.select({ count: sql<number>`count(*)::int` }).from(projects).where(where),
+    ]);
+
+    return { items: items as ProjectRow[], page, pageSize, total: extractTotal(countRows) };
+  }
+
+  async softDelete(id: string): Promise<void> {
+    await this.db
+      .update(projects)
+      .set({ deletedAt: sql`now()` })
+      .where(eq(projects.id, id));
+  }
+}

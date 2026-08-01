@@ -13,6 +13,9 @@ build/
 .next/
 out/
 
+# Test coverage reports
+coverage/
+
 # Logs
 *.log
 npm-debug.log*

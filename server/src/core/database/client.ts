@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { Pool } from "pg";
-import { drizzle } from "drizzle-orm/node-postgres";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "./schema/index";
 
 function requireEnv(name: string): string {
@@ -20,4 +20,9 @@ const pool = new Pool({
 });
 
 export const db = drizzle(pool, { schema });
-export type Database = typeof db;
+
+/**
+ * Structural type shared by the pool-backed client and `db.transaction()` callbacks, so
+ * repositories accept either without depending on the pool-only `$client` handle.
+ */
+export type Database = NodePgDatabase<typeof schema>;
