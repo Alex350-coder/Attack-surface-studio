@@ -78,7 +78,7 @@ export class DrizzleUsersRepository implements UsersRepository {
       this.db.select({ count: sql<number>`count(*)::int` }).from(users).where(where),
     ]);
 
-    return { items: items as UserRow[], page, pageSize, total: extractTotal(countRows) };
+    return { items, page, pageSize, total: extractTotal(countRows) };
   }
 
   async softDelete(id: string): Promise<void> {

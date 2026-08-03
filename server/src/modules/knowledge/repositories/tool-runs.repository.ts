@@ -93,6 +93,6 @@ export class DrizzleToolRunsRepository implements ToolRunsRepository {
       this.db.select({ count: sql<number>`count(*)::int` }).from(toolRuns).where(where),
     ]);
 
-    return { items: items as ToolRunRow[], page, pageSize, total: extractTotal(countRows) };
+    return { items, page, pageSize, total: extractTotal(countRows) };
   }
 }

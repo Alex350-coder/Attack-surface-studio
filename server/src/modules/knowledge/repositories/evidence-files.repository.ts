@@ -91,7 +91,7 @@ export class DrizzleEvidenceFilesRepository implements EvidenceFilesRepository {
       this.db.select({ count: sql<number>`count(*)::int` }).from(evidenceFiles).where(where),
     ]);
 
-    return { items: items as EvidenceFileRow[], page, pageSize, total: extractTotal(countRows) };
+    return { items, page, pageSize, total: extractTotal(countRows) };
   }
 
   async softDelete(projectId: string, id: string): Promise<void> {

@@ -174,7 +174,6 @@ async function main(): Promise<void> {
   const users = new DrizzleUsersRepository(db);
   const projectsRepo = new DrizzleProjectsRepository(db);
   const nodesRepo = new DrizzleNodesRepository(db);
-  const edgesRepo = new DrizzleEdgesRepository(db);
 
   const owner =
     (await users.findByEmail("demo@attacksurfacestudio.dev")) ??
@@ -220,7 +219,6 @@ async function main(): Promise<void> {
 
   const nodesRow = await nodesRepo.listByProject(project.id, {}, { pageSize: 100 });
 
-  // eslint-disable-next-line no-console -- seed script, not shipped application code
   console.log(
     `Seeded project "${project.name}" (${project.id}) with ${nodesRow.total} nodes and ${edgeCount} edges.`,
   );
@@ -230,7 +228,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  // eslint-disable-next-line no-console -- seed script, not shipped application code
   console.error("Seed failed:", error);
   process.exit(1);
 });
