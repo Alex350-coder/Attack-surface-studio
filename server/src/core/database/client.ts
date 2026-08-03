@@ -22,6 +22,15 @@ const pool = new Pool({
 export const db = drizzle(pool, { schema });
 
 /**
+ * Closes the runtime pool's connections. Used by e2e tests tearing down an ephemeral
+ * Postgres container, so the pool doesn't observe an abrupt "administrator command"
+ * termination once the container stops.
+ */
+export async function closeDatabasePool(): Promise<void> {
+  await pool.end();
+}
+
+/**
  * Structural type shared by the pool-backed client and `db.transaction()` callbacks, so
  * repositories accept either without depending on the pool-only `$client` handle.
  */

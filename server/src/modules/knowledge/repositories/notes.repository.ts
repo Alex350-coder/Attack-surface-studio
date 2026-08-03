@@ -87,7 +87,7 @@ export class DrizzleNotesRepository implements NotesRepository {
       this.db.select({ count: sql<number>`count(*)::int` }).from(notes).where(where),
     ]);
 
-    return { items: items as NoteRow[], page, pageSize, total: extractTotal(countRows) };
+    return { items, page, pageSize, total: extractTotal(countRows) };
   }
 
   async softDelete(projectId: string, id: string): Promise<void> {
