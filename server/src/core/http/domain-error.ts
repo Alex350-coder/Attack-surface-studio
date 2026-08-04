@@ -26,3 +26,13 @@ export class ConflictError extends DomainError {
   readonly code = "CONFLICT";
   readonly httpStatus = 409;
 }
+
+export class UnauthorizedError extends DomainError {
+  readonly code = "UNAUTHORIZED";
+  readonly httpStatus = 401;
+}
+
+export class ForbiddenError extends DomainError {
+  readonly code = "FORBIDDEN";
+  readonly httpStatus = 403;
+}
