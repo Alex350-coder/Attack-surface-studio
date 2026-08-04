@@ -5,6 +5,7 @@ import { ConfigModule } from "./core/config/config.module";
 import { LoggingModule } from "./core/logging/logging.module";
 import { DatabaseModule } from "./core/database/database.module";
 import { CorrelationIdMiddleware } from "./core/middleware/correlation-id.middleware";
+import { RlsContextMiddleware } from "./core/http/rls-context.middleware";
 import { HealthModule } from "./modules/health/health.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
 import { UsersModule } from "./modules/users/users.module";
@@ -34,10 +35,13 @@ const THROTTLE_LIMIT = 100;
     ReportsModule,
     AssistantModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [RlsContextMiddleware, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(CorrelationIdMiddleware).forRoutes("*");
+    // RlsContextMiddleware must run before guards (Nest lifecycle: middleware -> guards ->
+    // interceptors -> handler), so any guard's own repository queries (e.g. RolesGuard's
+    // `project_members` lookup) can participate in Postgres RLS. See ARCHITECTURE.md ADR-009.
+    consumer.apply(RlsContextMiddleware, CorrelationIdMiddleware).forRoutes("*");
   }
 }
