@@ -19,6 +19,11 @@ export const envSchema = z.object({
         .filter((origin) => origin.length > 0),
     ),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
+  // Refresh tokens are opaque CSPRNG values (see sessions.ts), not JWTs -- only the access
+  // token is signed, so only JWT_ACCESS_SECRET is needed.
+  JWT_ACCESS_SECRET: z.string().min(32, "JWT_ACCESS_SECRET must be at least 32 characters"),
+  JWT_ACCESS_TTL: z.string().default("15m"),
+  JWT_REFRESH_TTL: z.string().default("7d"),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
