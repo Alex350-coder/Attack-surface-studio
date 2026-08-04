@@ -4,6 +4,7 @@ import { validateEnv } from "../../src/core/config/env.schema";
 const REQUIRED_VARS = {
   DATABASE_URL: "postgresql://user:pass@localhost:5432/db",
   APP_DATABASE_URL: "postgresql://user:pass@localhost:5432/db",
+  JWT_ACCESS_SECRET: "a".repeat(32),
 };
 
 describe("validateEnv", () => {
@@ -13,6 +14,12 @@ describe("validateEnv", () => {
     expect(config.PORT).toBe(3000);
     expect(config.LOG_LEVEL).toBe("info");
     expect(config.CORS_ORIGINS).toEqual([]);
+    expect(config.JWT_ACCESS_TTL).toBe("15m");
+    expect(config.JWT_REFRESH_TTL).toBe("7d");
+  });
+
+  it("fails fast when a JWT secret is too short", () => {
+    expect(() => validateEnv({ ...REQUIRED_VARS, JWT_ACCESS_SECRET: "too-short" })).toThrow(/JWT_ACCESS_SECRET/);
   });
 
   it("parses a comma-separated CORS_ORIGINS list, trimming whitespace", () => {

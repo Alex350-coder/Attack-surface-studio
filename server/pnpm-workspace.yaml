@@ -1,6 +1,7 @@
 allowBuilds:
   '@nestjs/core': true
   '@swc/core': true
+  argon2: true
   cpu-features: true
   esbuild: true
   protobufjs: true
