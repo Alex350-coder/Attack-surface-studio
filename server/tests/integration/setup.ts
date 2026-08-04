@@ -33,6 +33,20 @@ export async function startTestDatabase(): Promise<TestDatabase> {
 export async function stopTestDatabase(): Promise<void> {
   await pool?.end();
   await container?.stop();
+  container = undefined;
+  pool = undefined;
+}
+
+/** Connection coordinates for tests that need a second, non-owner Postgres role (e.g. RLS proof tests). */
+export function getTestConnectionInfo(): { host: string; port: number; database: string } {
+  if (!container) {
+    throw new Error("Test database is not running -- call startTestDatabase() first.");
+  }
+  return {
+    host: container.getHost(),
+    port: container.getPort(),
+    database: container.getDatabase(),
+  };
 }
 
 const TABLES_IN_DEPENDENCY_ORDER = [
@@ -45,6 +59,7 @@ const TABLES_IN_DEPENDENCY_ORDER = [
   "nodes",
   "project_members",
   "projects",
+  "sessions",
   "users",
 ] as const;
 

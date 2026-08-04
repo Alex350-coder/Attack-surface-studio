@@ -9,8 +9,21 @@ import { rawOutputs } from "./rawOutputs";
 import { evidenceFiles } from "./evidenceFiles";
 import { notes } from "./notes";
 import { reports } from "./reports";
+import { sessions } from "./sessions";
 
-export { projects, users, projectMembers, nodes, edges, toolRuns, rawOutputs, evidenceFiles, notes, reports };
+export {
+  projects,
+  users,
+  projectMembers,
+  nodes,
+  edges,
+  toolRuns,
+  rawOutputs,
+  evidenceFiles,
+  notes,
+  reports,
+  sessions,
+};
 
 export const projectsRelations = relations(projects, ({ many, one }) => ({
   members: many(projectMembers),
@@ -25,6 +38,11 @@ export const projectsRelations = relations(projects, ({ many, one }) => ({
 
 export const usersRelations = relations(users, ({ many }) => ({
   memberships: many(projectMembers),
+  sessions: many(sessions),
+}));
+
+export const sessionsRelations = relations(sessions, ({ one }) => ({
+  user: one(users, { fields: [sessions.userId], references: [users.id] }),
 }));
 
 export const projectMembersRelations = relations(projectMembers, ({ one }) => ({

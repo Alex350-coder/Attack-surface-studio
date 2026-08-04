@@ -8,6 +8,20 @@
       "when": 1785531708212,
       "tag": "0000_rich_ben_grimm",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785805509274,
+      "tag": "0001_calm_thunderbolt",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785805553670,
+      "tag": "0002_enable_row_level_security",
+      "breakpoints": true
     }
   ]
 }
