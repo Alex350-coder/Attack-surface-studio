@@ -327,6 +327,12 @@ describe("Projects flows (POST/GET/PATCH/DELETE /api/v1/projects/*)", () => {
       .get(`/api/v1/projects/${project.id}`)
       .set("Authorization", `Bearer ${owner.accessToken}`);
     expect(detailAfterDeleteRes.status).toBe(404);
+
+    const patchAfterDeleteRes = await request(server())
+      .patch(`/api/v1/projects/${project.id}`)
+      .set("Authorization", `Bearer ${owner.accessToken}`)
+      .send({ name: "Renamed after delete" });
+    expect(patchAfterDeleteRes.status).toBe(404);
   });
 
   it("rejects every /projects route without an Authorization header", async () => {

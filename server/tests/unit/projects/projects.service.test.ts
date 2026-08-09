@@ -227,6 +227,7 @@ describe("ProjectsService", () => {
         deletedAt: null,
       };
 
+      projectsRepository.findById.mockResolvedValue(makeProject());
       nodesRepository.listByProject.mockResolvedValue({ items: [node], page: 1, pageSize: 25, total: 1 });
       edgesRepository.listByProject.mockResolvedValue({ items: [edge], page: 1, pageSize: 25, total: 1 });
 
