@@ -1,6 +1,6 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type { Database } from "../../../core/database/client";
-import { projects } from "../../../core/database/schema";
+import { projectMembers, projects } from "../../../core/database/schema";
 import { projectScopeSchema, type ProjectScope } from "./project-scope.schema";
 import {
   extractTotal,
@@ -33,10 +33,23 @@ export interface ProjectCreateInput {
  */
 export interface ProjectsRepository {
   create(input: ProjectCreateInput): Promise<ProjectRow>;
+  /**
+   * Atomically creates a project and its owner `project_members` row via the
+   * `create_project_with_owner` SECURITY DEFINER function (migration 0003), which bypasses the
+   * RLS `RETURNING`-vs-SELECT-policy conflict a plain `create()` would hit for the creating user
+   * (ADR-010). This is the path `ProjectsService.createProject` uses for real request traffic;
+   * `create()` remains for seeds/fixtures that manage membership separately.
+   */
+  createWithOwner(input: ProjectCreateInput & { createdBy: string }): Promise<ProjectRow>;
   updateScope(id: string, scope: ProjectScope): Promise<ProjectRow | null>;
   findById(id: string): Promise<ProjectRow | null>;
   findBySlug(slug: string): Promise<ProjectRow | null>;
   list(pagination?: PaginationParams): Promise<Paginated<ProjectRow>>;
+  /**
+   * Scopes the result to projects the given user is a member of (SEC-012 defense in depth
+   * alongside RLS, not a replacement for it) — the query `GET /projects` uses.
+   */
+  listForUser(userId: string, pagination?: PaginationParams): Promise<Paginated<ProjectRow>>;
   softDelete(id: string): Promise<void>;
 }
 
@@ -55,6 +68,36 @@ export class DrizzleProjectsRepository implements ProjectsRepository {
       })
       .returning();
     return row as ProjectRow;
+  }
+
+  async createWithOwner(input: ProjectCreateInput & { createdBy: string }): Promise<ProjectRow> {
+    const scope = projectScopeSchema.parse(input.scope ?? {});
+    const result = await this.db.execute<{
+      id: string;
+      name: string;
+      slug: string;
+      scope: ProjectScope;
+      created_by: string | null;
+      created_at: Date;
+      updated_at: Date;
+      deleted_at: Date | null;
+    }>(
+      sql`select * from create_project_with_owner(${input.name}, ${input.slug}, ${JSON.stringify(scope)}::jsonb, ${input.createdBy})`,
+    );
+    const row = result.rows[0];
+    if (!row) {
+      throw new Error("create_project_with_owner returned no row");
+    }
+    return {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      scope: row.scope,
+      createdBy: row.created_by,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      deletedAt: row.deleted_at,
+    };
   }
 
   async updateScope(id: string, scope: ProjectScope): Promise<ProjectRow | null> {
@@ -92,6 +135,37 @@ export class DrizzleProjectsRepository implements ProjectsRepository {
     const [items, countRows] = await Promise.all([
       this.db.select().from(projects).where(where).limit(pageSize).offset(offset),
       this.db.select({ count: sql<number>`count(*)::int` }).from(projects).where(where),
+    ]);
+
+    return { items: items as ProjectRow[], page, pageSize, total: extractTotal(countRows) };
+  }
+
+  async listForUser(userId: string, pagination?: PaginationParams): Promise<Paginated<ProjectRow>> {
+    const { page, pageSize, offset } = normalizePagination(pagination);
+    const where = and(eq(projectMembers.userId, userId), isNull(projects.deletedAt));
+
+    const [items, countRows] = await Promise.all([
+      this.db
+        .select({
+          id: projects.id,
+          name: projects.name,
+          slug: projects.slug,
+          scope: projects.scope,
+          createdBy: projects.createdBy,
+          createdAt: projects.createdAt,
+          updatedAt: projects.updatedAt,
+          deletedAt: projects.deletedAt,
+        })
+        .from(projects)
+        .innerJoin(projectMembers, eq(projectMembers.projectId, projects.id))
+        .where(where)
+        .limit(pageSize)
+        .offset(offset),
+      this.db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(projects)
+        .innerJoin(projectMembers, eq(projectMembers.projectId, projects.id))
+        .where(where),
     ]);
 
     return { items: items as ProjectRow[], page, pageSize, total: extractTotal(countRows) };
