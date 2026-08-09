@@ -36,6 +36,13 @@
       "when": 1786311571568,
       "tag": "0004_add_project_members_user_index",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786317662279,
+      "tag": "0005_chief_lady_vermin",
+      "breakpoints": true
     }
   ]
 }
