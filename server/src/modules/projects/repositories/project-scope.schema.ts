@@ -4,8 +4,10 @@ import { z } from "zod";
 const HOSTNAME_PATTERN = /^(\*\.)?(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))*\.[a-z]{2,63}$/i;
 
 function isValidCidr(value: string): boolean {
-  const [address, prefix] = value.split("/");
-  if (!address || prefix === undefined) return false;
+  const parts = value.split("/");
+  if (parts.length !== 2) return false;
+  const [address, prefix] = parts;
+  if (!address || !prefix) return false;
   if (!/^\d+$/.test(prefix)) return false;
 
   const prefixNum = Number(prefix);
@@ -39,9 +41,11 @@ const scopeEntrySchema = z
  * before any tool run (SECURITY_MODEL.md "Enforce scope before execution"). Kept minimal now;
  * Phase 6+ orchestrator work extends this schema rather than replacing it.
  */
+const MAX_SCOPE_ENTRIES = 500;
+
 export const projectScopeSchema = z.object({
-  includes: z.array(scopeEntrySchema).default([]),
-  excludes: z.array(scopeEntrySchema).default([]),
+  includes: z.array(scopeEntrySchema).max(MAX_SCOPE_ENTRIES).default([]),
+  excludes: z.array(scopeEntrySchema).max(MAX_SCOPE_ENTRIES).default([]),
 });
 
 export type ProjectScope = z.infer<typeof projectScopeSchema>;

@@ -1,6 +1,8 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type { Database } from "../../../core/database/client";
 import { projectMembers, projects } from "../../../core/database/schema";
+import { isUniqueViolation } from "../../../core/database/pg-error";
+import { ConflictError } from "../../../core/http/domain-error";
 import { projectScopeSchema, type ProjectScope } from "./project-scope.schema";
 import {
   extractTotal,
@@ -74,7 +76,7 @@ export class DrizzleProjectsRepository implements ProjectsRepository {
 
   async createWithOwner(input: ProjectCreateInput & { createdBy: string }): Promise<ProjectRow> {
     const scope = projectScopeSchema.parse(input.scope ?? {});
-    const result = await this.db.execute<{
+    type CreateProjectWithOwnerRow = {
       id: string;
       name: string;
       slug: string;
@@ -83,10 +85,19 @@ export class DrizzleProjectsRepository implements ProjectsRepository {
       created_at: Date;
       updated_at: Date;
       deleted_at: Date | null;
-    }>(
-      sql`select * from create_project_with_owner(${input.name}, ${input.slug}, ${JSON.stringify(scope)}::jsonb, ${input.createdBy})`,
-    );
-    const row = result.rows[0];
+    };
+    let row: CreateProjectWithOwnerRow | undefined;
+    try {
+      const result = await this.db.execute<CreateProjectWithOwnerRow>(
+        sql`select * from create_project_with_owner(${input.name}, ${input.slug}, ${JSON.stringify(scope)}::jsonb, ${input.createdBy})`,
+      );
+      row = result.rows[0];
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictError(`A project with slug "${input.slug}" already exists`);
+      }
+      throw error;
+    }
     if (!row) {
       throw new Error("create_project_with_owner returned no row");
     }
@@ -107,7 +118,7 @@ export class DrizzleProjectsRepository implements ProjectsRepository {
     const [row] = await this.db
       .update(projects)
       .set({ scope: validScope, updatedAt: sql`now()` })
-      .where(eq(projects.id, id))
+      .where(and(eq(projects.id, id), isNull(projects.deletedAt)))
       .returning();
     return (row as ProjectRow) ?? null;
   }
@@ -122,7 +133,11 @@ export class DrizzleProjectsRepository implements ProjectsRepository {
     if (patch.scope !== undefined) {
       set.scope = projectScopeSchema.parse(patch.scope);
     }
-    const [row] = await this.db.update(projects).set(set).where(eq(projects.id, id)).returning();
+    const [row] = await this.db
+      .update(projects)
+      .set(set)
+      .where(and(eq(projects.id, id), isNull(projects.deletedAt)))
+      .returning();
     return (row as ProjectRow) ?? null;
   }
 

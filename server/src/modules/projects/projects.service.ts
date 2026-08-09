@@ -14,7 +14,7 @@ import { toProjectDto, toProjectMemberDto, type ProjectDto, type ProjectMemberDt
 import { canAssignRole } from "./policies/project-member.policy";
 import { PROJECT_MEMBERS_REPOSITORY, PROJECTS_REPOSITORY } from "./projects.tokens";
 import type { ProjectMembersRepository } from "./repositories/project-members.repository";
-import type { ProjectsRepository } from "./repositories/projects.repository";
+import type { ProjectRow, ProjectsRepository } from "./repositories/projects.repository";
 
 export interface ProjectGraph {
   nodes: Paginated<Node>;
@@ -51,14 +51,12 @@ export class ProjectsService {
   }
 
   async getProjectDetail(projectId: string): Promise<ProjectDto> {
-    const row = await this.projectsRepository.findById(projectId);
-    if (!row) {
-      throw new NotFoundError("Project not found");
-    }
+    const row = await this.requireProject(projectId);
     return toProjectDto(row);
   }
 
   async updateProject(projectId: string, dto: UpdateProjectDto): Promise<ProjectDto> {
+    await this.requireProject(projectId);
     const row = await this.projectsRepository.update(projectId, { name: dto.name, scope: dto.scope });
     if (!row) {
       throw new NotFoundError("Project not found");
@@ -67,10 +65,7 @@ export class ProjectsService {
   }
 
   async deleteProject(projectId: string): Promise<void> {
-    const existing = await this.projectsRepository.findById(projectId);
-    if (!existing) {
-      throw new NotFoundError("Project not found");
-    }
+    await this.requireProject(projectId);
     await this.projectsRepository.softDelete(projectId);
   }
 
@@ -113,6 +108,7 @@ export class ProjectsService {
 
   /** Returns only normalized graph objects (ARC-001) — never raw tool output. */
   async getGraph(projectId: string, pagination?: PaginationParams): Promise<ProjectGraph> {
+    await this.requireProject(projectId);
     const [nodes, edges] = await Promise.all([
       this.nodesRepository.listByProject(projectId, undefined, pagination),
       this.edgesRepository.listByProject(projectId, undefined, pagination),
@@ -122,5 +118,14 @@ export class ProjectsService {
       nodes: { ...nodes, items: nodes.items.map((node) => nodeSchema.parse(node)) },
       edges: { ...edges, items: edges.items.map((edge) => edgeSchema.parse(edge)) },
     };
+  }
+
+  /** Loads a non-deleted project or throws 404 — shared by every route that needs one to exist. */
+  private async requireProject(projectId: string): Promise<ProjectRow> {
+    const row = await this.projectsRepository.findById(projectId);
+    if (!row) {
+      throw new NotFoundError("Project not found");
+    }
+    return row;
   }
 }
