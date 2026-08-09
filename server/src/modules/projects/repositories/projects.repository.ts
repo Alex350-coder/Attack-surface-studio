@@ -42,6 +42,8 @@ export interface ProjectsRepository {
    */
   createWithOwner(input: ProjectCreateInput & { createdBy: string }): Promise<ProjectRow>;
   updateScope(id: string, scope: ProjectScope): Promise<ProjectRow | null>;
+  /** Updates whichever of `name`/`scope` are provided in a single write — used by `PATCH /projects/:id`. */
+  update(id: string, patch: { name?: string; scope?: ProjectScope }): Promise<ProjectRow | null>;
   findById(id: string): Promise<ProjectRow | null>;
   findBySlug(slug: string): Promise<ProjectRow | null>;
   list(pagination?: PaginationParams): Promise<Paginated<ProjectRow>>;
@@ -107,6 +109,20 @@ export class DrizzleProjectsRepository implements ProjectsRepository {
       .set({ scope: validScope, updatedAt: sql`now()` })
       .where(eq(projects.id, id))
       .returning();
+    return (row as ProjectRow) ?? null;
+  }
+
+  async update(id: string, patch: { name?: string; scope?: ProjectScope }): Promise<ProjectRow | null> {
+    const set: { updatedAt: ReturnType<typeof sql>; name?: string; scope?: ProjectScope } = {
+      updatedAt: sql`now()`,
+    };
+    if (patch.name !== undefined) {
+      set.name = patch.name;
+    }
+    if (patch.scope !== undefined) {
+      set.scope = projectScopeSchema.parse(patch.scope);
+    }
+    const [row] = await this.db.update(projects).set(set).where(eq(projects.id, id)).returning();
     return (row as ProjectRow) ?? null;
   }
 
