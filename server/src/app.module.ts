@@ -1,7 +1,9 @@
 import { MiddlewareConsumer, Module, type NestModule } from "@nestjs/common";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { APP_GUARD } from "@nestjs/core";
+import { ConfigService } from "@nestjs/config";
 import { ConfigModule } from "./core/config/config.module";
+import type { EnvConfig } from "./core/config/env.schema";
 import { LoggingModule } from "./core/logging/logging.module";
 import { DatabaseModule } from "./core/database/database.module";
 import { QueueModule } from "./core/queue/queue.module";
@@ -17,16 +19,18 @@ import { AdaptersModule } from "./modules/adapters/adapters.module";
 import { ReportsModule } from "./modules/reports/reports.module";
 import { AssistantModule } from "./modules/assistant/assistant.module";
 
-const THROTTLE_TTL_MS = 60_000;
-const THROTTLE_LIMIT = 100;
-
 @Module({
   imports: [
     ConfigModule,
     LoggingModule,
     DatabaseModule,
     QueueModule,
-    ThrottlerModule.forRoot([{ ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMIT }]),
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<EnvConfig, true>) => [
+        { ttl: config.get("THROTTLE_TTL_MS", { infer: true }), limit: config.get("THROTTLE_LIMIT", { infer: true }) },
+      ],
+    }),
     HealthModule,
     ProjectsModule,
     UsersModule,

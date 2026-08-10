@@ -27,6 +27,11 @@ export const envSchema = z.object({
   JWT_ACCESS_SECRET: z.string().min(32, "JWT_ACCESS_SECRET must be at least 32 characters"),
   JWT_ACCESS_TTL: z.string().default("15m"),
   JWT_REFRESH_TTL: z.string().default("7d"),
+  // Global request-rate limit (ThrottlerGuard, app.module.ts). Configurable so integration
+  // suites that legitimately poll far more often than a real client can raise the ceiling
+  // without weakening it for the deployed API.
+  THROTTLE_TTL_MS: z.coerce.number().int().positive().default(60_000),
+  THROTTLE_LIMIT: z.coerce.number().int().positive().default(100),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

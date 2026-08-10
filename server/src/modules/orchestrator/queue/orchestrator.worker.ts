@@ -55,44 +55,50 @@ export class OrchestratorWorker {
   private async process(job: Job<RunJobData, RunJobResult>): Promise<RunJobResult> {
     const { runId, projectId, adapterId, executionMode, target, triggeredBy, options } = job.data;
 
-    return runWithUserContext(triggeredBy, async () => {
-      const claimed = await this.toolRunsRepository.updateStatus(
+    // Each RLS-scoped write below runs in its OWN short-lived transaction (runWithUserContext
+    // opens/commits one per call), rather than one transaction spanning the whole job. Wrapping
+    // the entire run (which can take from milliseconds to the adapter's full timeout) in a single
+    // transaction would hold a row lock on this `tool_runs` row for that entire duration: the
+    // "running" write would stay uncommitted and invisible to pollers, and a concurrent
+    // `cancelRun` UPDATE would block on that lock instead of taking effect immediately.
+    const claimed = await runWithUserContext(triggeredBy, () =>
+      this.toolRunsRepository.updateStatus(
         projectId,
         runId,
         { status: "running", startedAt: new Date() },
         ["queued"],
-      );
-      if (!claimed) {
-        // Already cancelled, or a retry attempt racing a cancel -- nothing left to do.
-        return { status: "cancelled" };
-      }
+      ),
+    );
+    if (!claimed) {
+      // Already cancelled, or a retry attempt racing a cancel -- nothing left to do.
+      return { status: "cancelled" };
+    }
 
-      const channel = runCancelChannel(runId);
-      const abortController = new AbortController();
-      const onMessage = (receivedChannel: string): void => {
-        if (receivedChannel === channel) {
-          abortController.abort();
-        }
-      };
-      await this.subscriber.subscribe(channel);
-      this.subscriber.on("message", onMessage);
-
-      try {
-        return await this.execute(job, {
-          projectId,
-          runId,
-          adapterId,
-          executionMode,
-          target,
-          triggeredBy,
-          options,
-          signal: abortController.signal,
-        });
-      } finally {
-        this.subscriber.off("message", onMessage);
-        await this.subscriber.unsubscribe(channel);
+    const channel = runCancelChannel(runId);
+    const abortController = new AbortController();
+    const onMessage = (receivedChannel: string): void => {
+      if (receivedChannel === channel) {
+        abortController.abort();
       }
-    });
+    };
+    await this.subscriber.subscribe(channel);
+    this.subscriber.on("message", onMessage);
+
+    try {
+      return await this.execute(job, {
+        projectId,
+        runId,
+        adapterId,
+        executionMode,
+        target,
+        triggeredBy,
+        options,
+        signal: abortController.signal,
+      });
+    } finally {
+      this.subscriber.off("message", onMessage);
+      await this.subscriber.unsubscribe(channel);
+    }
   }
 
   private async execute(
@@ -111,7 +117,7 @@ export class OrchestratorWorker {
     const { projectId, runId, adapterId, executionMode, target, triggeredBy, options, signal } = input;
 
     try {
-      const project = await this.projectsRepository.findById(projectId);
+      const project = await runWithUserContext(triggeredBy, () => this.projectsRepository.findById(projectId));
       if (!project) {
         throw new NotFoundError(`Project ${projectId} not found`);
       }
@@ -143,7 +149,7 @@ export class OrchestratorWorker {
       const durationMs = Date.now() - startedAt;
 
       if (result.cancelled) {
-        await this.markTerminal(projectId, runId, "cancelled");
+        await this.markTerminal(triggeredBy, projectId, runId, "cancelled");
         return { status: "cancelled" };
       }
       if (result.timedOut) {
@@ -160,24 +166,27 @@ export class OrchestratorWorker {
       });
       const delta = await adapter.normalize(parsed, ctx);
 
-      await this.toolRunsRepository.updateStatus(
-        projectId,
-        runId,
-        {
-          status: "succeeded",
-          finishedAt: new Date(),
-          stats: { durationMs, nodeCount: delta.nodes.length, edgeCount: delta.edges.length },
-        },
-        ["running"],
+      await runWithUserContext(triggeredBy, () =>
+        this.toolRunsRepository.updateStatus(
+          projectId,
+          runId,
+          {
+            status: "succeeded",
+            finishedAt: new Date(),
+            stats: { durationMs, nodeCount: delta.nodes.length, edgeCount: delta.edges.length },
+          },
+          ["running"],
+        ),
       );
       return { status: "succeeded" };
     } catch (error) {
-      return this.handleFailure(job, projectId, runId, error);
+      return this.handleFailure(job, triggeredBy, projectId, runId, error);
     }
   }
 
   private async handleFailure(
     job: Job<RunJobData, RunJobResult>,
+    triggeredBy: string,
     projectId: string,
     runId: string,
     error: unknown,
@@ -185,11 +194,13 @@ export class OrchestratorWorker {
     if (error instanceof AdapterError) {
       const attemptNumber = job.attemptsMade + 1;
       if (shouldRetry(error.code, attemptNumber)) {
-        await this.toolRunsRepository.updateStatus(projectId, runId, { status: "queued" }, ["running"]);
+        await runWithUserContext(triggeredBy, () =>
+          this.toolRunsRepository.updateStatus(projectId, runId, { status: "queued" }, ["running"]),
+        );
         throw error;
       }
       const decision = getRetryDecision(error.code);
-      await this.markTerminal(projectId, runId, "failed", {
+      await this.markTerminal(triggeredBy, projectId, runId, "failed", {
         code: error.code,
         message: error.message,
         attempts: attemptNumber,
@@ -199,26 +210,29 @@ export class OrchestratorWorker {
     }
 
     if (error instanceof ScopeViolationError || error instanceof NotFoundError) {
-      await this.markTerminal(projectId, runId, "failed", { code: error.code, message: error.message });
+      await this.markTerminal(triggeredBy, projectId, runId, "failed", { code: error.code, message: error.message });
       return { status: "failed" };
     }
 
     const message = error instanceof Error ? error.message : String(error);
-    await this.markTerminal(projectId, runId, "failed", { code: "UNKNOWN", message });
+    await this.markTerminal(triggeredBy, projectId, runId, "failed", { code: "UNKNOWN", message });
     return { status: "failed" };
   }
 
   private async markTerminal(
+    triggeredBy: string,
     projectId: string,
     runId: string,
     status: "failed" | "cancelled",
     error?: unknown,
   ): Promise<void> {
-    await this.toolRunsRepository.updateStatus(
-      projectId,
-      runId,
-      { status, finishedAt: new Date(), ...(error !== undefined ? { error } : {}) },
-      ["running"],
+    await runWithUserContext(triggeredBy, () =>
+      this.toolRunsRepository.updateStatus(
+        projectId,
+        runId,
+        { status, finishedAt: new Date(), ...(error !== undefined ? { error } : {}) },
+        ["running"],
+      ),
     );
   }
 
