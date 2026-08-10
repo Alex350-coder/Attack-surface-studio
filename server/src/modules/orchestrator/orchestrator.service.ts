@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConflictError, NotFoundError, ScopeViolationError } from "../../core/http/domain-error";
 import type { Paginated, PaginationParams } from "../shared/repository.types";
 import { PROJECTS_REPOSITORY } from "../projects/projects.tokens";
@@ -15,6 +15,8 @@ import type { EnqueueRunDto } from "./dto/enqueue-run.dto";
 /** The API process's side of the Orchestrator: authorizes, persists, and enqueues -- it never executes anything itself. */
 @Injectable()
 export class OrchestratorService {
+  private readonly logger = new Logger(OrchestratorService.name);
+
   constructor(
     @Inject(PROJECTS_REPOSITORY) private readonly projectsRepository: ProjectsRepository,
     @Inject(TOOL_RUNS_REPOSITORY) private readonly toolRunsRepository: ToolRunsRepository,
@@ -34,15 +36,30 @@ export class OrchestratorService {
       triggeredBy: actingUserId,
     });
 
-    await this.queue.enqueue({
-      runId: row.id,
-      projectId,
-      adapterId: dto.adapterId,
-      executionMode: dto.executionMode,
-      target: dto.target,
-      triggeredBy: actingUserId,
-      options: dto.options,
-    });
+    try {
+      await this.queue.enqueue({
+        runId: row.id,
+        projectId,
+        adapterId: dto.adapterId,
+        executionMode: dto.executionMode,
+        target: dto.target,
+        triggeredBy: actingUserId,
+        options: dto.options,
+      });
+    } catch (error) {
+      // The `tool_runs` row already exists but no worker will ever pick it up -- left as
+      // "queued" it would be a permanently stuck run invisible to any retry mechanism. Mark it
+      // failed so it surfaces to the caller/UI instead of silently hanging forever.
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to enqueue run ${row.id} after creating its row: ${message}`);
+      await this.toolRunsRepository.updateStatus(
+        projectId,
+        row.id,
+        { status: "failed", finishedAt: new Date(), error: { code: "ENQUEUE_FAILED", message } },
+        ["queued"],
+      );
+      throw error;
+    }
 
     return toToolRunDto(row);
   }

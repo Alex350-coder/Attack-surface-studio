@@ -60,12 +60,14 @@ describe("ToolRunsRepository", () => {
     await repo.updateStatus(projectId, run.id, { status: "cancelled", finishedAt: new Date() });
 
     // A late "succeeded" write from a worker that didn't know about the cancellation must not
-    // clobber the terminal "cancelled" status (OWA-020).
+    // clobber the terminal "cancelled" status (OWA-020). "running" is the only real predecessor
+    // of "succeeded" (tool-run-transitions.ts); the row is actually "cancelled" here, so the
+    // conditional WHERE simply finds no match regardless.
     const clobbered = await repo.updateStatus(
       projectId,
       run.id,
       { status: "succeeded", finishedAt: new Date() },
-      ["queued", "running"],
+      ["running"],
     );
 
     expect(clobbered).toBeNull();

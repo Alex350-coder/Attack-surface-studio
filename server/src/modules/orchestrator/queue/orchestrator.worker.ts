@@ -21,6 +21,16 @@ import { ScopeViolationError, NotFoundError } from "../../../core/http/domain-er
 import { getRetryDecision, shouldRetry } from "../retry-policy";
 import type { RunJobData, RunJobResult } from "./run-job.types";
 
+/** Caps how much raw stdout/stderr gets attached to a failed run's `error` field for audit. */
+const RAW_OUTPUT_EXCERPT_BYTES = 8 * 1024;
+
+function excerpt(text: string): string {
+  const buf = Buffer.from(text, "utf8");
+  return buf.length <= RAW_OUTPUT_EXCERPT_BYTES
+    ? text
+    : `${buf.subarray(0, RAW_OUTPUT_EXCERPT_BYTES).toString("utf8")}\n[truncated]`;
+}
+
 /**
  * The worker process's side of the job queue: claims a queued run, re-validates its target's
  * scope (a project's scope can change between enqueue and execution -- EXE-003), executes it via
@@ -115,6 +125,7 @@ export class OrchestratorWorker {
     },
   ): Promise<RunJobResult> {
     const { projectId, runId, adapterId, executionMode, target, triggeredBy, options, signal } = input;
+    let capturedOutput: { stdout: string; stderr: string } | undefined;
 
     try {
       const project = await runWithUserContext(triggeredBy, () => this.projectsRepository.findById(projectId));
@@ -147,6 +158,7 @@ export class OrchestratorWorker {
         signal,
       });
       const durationMs = Date.now() - startedAt;
+      capturedOutput = { stdout: result.stdout, stderr: result.stderr };
 
       if (result.cancelled) {
         await this.markTerminal(triggeredBy, projectId, runId, "cancelled");
@@ -154,6 +166,12 @@ export class OrchestratorWorker {
       }
       if (result.timedOut) {
         throw new ExecutionTimeoutError(`Adapter "${adapterId}" timed out after ${invocation.timeoutMs}ms`);
+      }
+      if (result.exitCode === null) {
+        // The process never started (e.g. ENOENT -- the binary isn't on PATH). This is
+        // indistinguishable from "tool not available" and, unlike a non-zero exit, will never
+        // succeed on retry, so it must not be collapsed into the retryable NON_ZERO_EXIT path.
+        throw new ToolNotAvailableError(`Adapter "${adapterId}" failed to start: ${result.stderr.trim()}`);
       }
       if (result.exitCode !== 0) {
         throw new NonZeroExitError(`Adapter "${adapterId}" exited with code ${String(result.exitCode)}`);
@@ -166,7 +184,7 @@ export class OrchestratorWorker {
       });
       const delta = await adapter.normalize(parsed, ctx);
 
-      await runWithUserContext(triggeredBy, () =>
+      const updated = await runWithUserContext(triggeredBy, () =>
         this.toolRunsRepository.updateStatus(
           projectId,
           runId,
@@ -178,9 +196,15 @@ export class OrchestratorWorker {
           ["running"],
         ),
       );
+      if (!updated) {
+        // The row was already moved out of "running" by a concurrent cancel -- the run genuinely
+        // finished, but its outcome as tracked in `tool_runs` is "cancelled", not "succeeded".
+        this.logger.warn(`Run ${runId} succeeded but was concurrently cancelled; reporting cancelled`);
+        return { status: "cancelled" };
+      }
       return { status: "succeeded" };
     } catch (error) {
-      return this.handleFailure(job, triggeredBy, projectId, runId, error);
+      return this.handleFailure(job, triggeredBy, projectId, runId, error, capturedOutput);
     }
   }
 
@@ -190,13 +214,29 @@ export class OrchestratorWorker {
     projectId: string,
     runId: string,
     error: unknown,
+    capturedOutput?: { stdout: string; stderr: string },
   ): Promise<RunJobResult> {
+    // Raw stdout/stderr are attached (bounded) to the persisted error only for the codes where
+    // they carry investigation value -- a non-zero exit or output the adapter couldn't parse.
+    // Claude.md's "raw outputs are kept for traceability" principle otherwise had no home: the
+    // ProcessRunner/DockerRunner output was captured in memory and then discarded on failure.
+    const rawOutput =
+      capturedOutput && error instanceof AdapterError && (error.code === "NON_ZERO_EXIT" || error.code === "UNPARSEABLE_OUTPUT")
+        ? { stdout: excerpt(capturedOutput.stdout), stderr: excerpt(capturedOutput.stderr) }
+        : undefined;
+
     if (error instanceof AdapterError) {
       const attemptNumber = job.attemptsMade + 1;
       if (shouldRetry(error.code, attemptNumber)) {
-        await runWithUserContext(triggeredBy, () =>
+        const requeued = await runWithUserContext(triggeredBy, () =>
           this.toolRunsRepository.updateStatus(projectId, runId, { status: "queued" }, ["running"]),
         );
+        if (!requeued) {
+          // Row already left "running" (e.g. a concurrent cancel) -- don't let BullMQ retry a
+          // run that's no longer ours to retry.
+          this.logger.warn(`Run ${runId} was concurrently cancelled while a retry was being scheduled`);
+          return { status: "cancelled" };
+        }
         throw error;
       }
       const decision = getRetryDecision(error.code);
@@ -205,6 +245,7 @@ export class OrchestratorWorker {
         message: error.message,
         attempts: attemptNumber,
         maxAttempts: decision.maxAttempts,
+        ...(rawOutput ? { rawOutput } : {}),
       });
       return { status: "failed" };
     }
@@ -226,7 +267,7 @@ export class OrchestratorWorker {
     status: "failed" | "cancelled",
     error?: unknown,
   ): Promise<void> {
-    await runWithUserContext(triggeredBy, () =>
+    const updated = await runWithUserContext(triggeredBy, () =>
       this.toolRunsRepository.updateStatus(
         projectId,
         runId,
@@ -234,6 +275,11 @@ export class OrchestratorWorker {
         ["running"],
       ),
     );
+    if (!updated) {
+      // The row was already moved out of "running" (e.g. by a concurrent cancel) -- the terminal
+      // write we intended to make no longer applies. Not an error, but worth a trace for audits.
+      this.logger.debug(`markTerminal(${status}) for run ${runId} was a no-op -- row already left "running"`);
+    }
   }
 
   async close(): Promise<void> {
