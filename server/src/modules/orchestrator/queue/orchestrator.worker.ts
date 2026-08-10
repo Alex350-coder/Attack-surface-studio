@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { Worker, type Job } from "bullmq";
 import type IORedis from "ioredis";
 import { createRedisConnection } from "../../../core/queue/redis-connection";
@@ -27,6 +28,7 @@ import type { RunJobData, RunJobResult } from "./run-job.types";
  * updates (OWA-020) so a concurrent cancel signal can never be clobbered by a late success write.
  */
 export class OrchestratorWorker {
+  private readonly logger = new Logger(OrchestratorWorker.name);
   private readonly worker: Worker<RunJobData, RunJobResult>;
   private readonly subscriber: IORedis;
 
@@ -43,6 +45,11 @@ export class OrchestratorWorker {
       (job) => this.process(job),
       { connection: connectionOptions },
     );
+
+    // See OrchestratorQueue for why these listeners are required: an unhandled "error" event
+    // on an EventEmitter is rethrown as an uncaught exception and would crash the worker process.
+    this.worker.on("error", (error) => this.logger.error("Worker connection error", error));
+    this.subscriber.on("error", (error) => this.logger.error("Cancel-signal subscriber connection error", error));
   }
 
   private async process(job: Job<RunJobData, RunJobResult>): Promise<RunJobResult> {

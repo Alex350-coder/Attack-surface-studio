@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { Queue } from "bullmq";
 import type IORedis from "ioredis";
 import { createRedisConnection } from "../../../core/queue/redis-connection";
@@ -14,6 +15,7 @@ const RETRY_BACKOFF_MS = 5_000;
  * active job subscribes to -- `enqueue`/`requestCancel` are the only two operations the API needs.
  */
 export class OrchestratorQueue {
+  private readonly logger = new Logger(OrchestratorQueue.name);
   private readonly queue: Queue<RunJobData, RunJobResult>;
   private readonly publisher: IORedis;
 
@@ -22,6 +24,12 @@ export class OrchestratorQueue {
       connection: connectionOptions,
     });
     this.publisher = createRedisConnection();
+
+    // ioredis/BullMQ emit "error" on connection issues; Node's EventEmitter rethrows an
+    // unhandled "error" event as an uncaught exception, which would otherwise crash the whole
+    // API process on a transient Redis blip.
+    this.queue.on("error", (error) => this.logger.error("Queue connection error", error));
+    this.publisher.on("error", (error) => this.logger.error("Cancel-signal publisher connection error", error));
   }
 
   async enqueue(data: RunJobData): Promise<void> {

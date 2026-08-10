@@ -4,6 +4,7 @@ import { APP_GUARD } from "@nestjs/core";
 import { ConfigModule } from "./core/config/config.module";
 import { LoggingModule } from "./core/logging/logging.module";
 import { DatabaseModule } from "./core/database/database.module";
+import { QueueModule } from "./core/queue/queue.module";
 import { CorrelationIdMiddleware } from "./core/middleware/correlation-id.middleware";
 import { RlsContextMiddleware } from "./core/http/rls-context.middleware";
 import { HealthModule } from "./modules/health/health.module";
@@ -24,6 +25,7 @@ const THROTTLE_LIMIT = 100;
     ConfigModule,
     LoggingModule,
     DatabaseModule,
+    QueueModule,
     ThrottlerModule.forRoot([{ ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMIT }]),
     HealthModule,
     ProjectsModule,
