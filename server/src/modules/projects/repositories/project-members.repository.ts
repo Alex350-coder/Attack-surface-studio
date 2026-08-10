@@ -1,6 +1,8 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { Database } from "../../../core/database/client";
+import { isUniqueViolation } from "../../../core/database/pg-error";
 import { projectMembers } from "../../../core/database/schema";
+import { ConflictError } from "../../../core/http/domain-error";
 import {
   extractTotal,
   normalizePagination,
@@ -41,11 +43,18 @@ export class DrizzleProjectMembersRepository implements ProjectMembersRepository
   constructor(private readonly db: Database) {}
 
   async addMember(input: ProjectMemberCreateInput): Promise<ProjectMemberRow> {
-    const [row] = await this.db
-      .insert(projectMembers)
-      .values({ projectId: input.projectId, userId: input.userId, role: input.role })
-      .returning();
-    return row as ProjectMemberRow;
+    try {
+      const [row] = await this.db
+        .insert(projectMembers)
+        .values({ projectId: input.projectId, userId: input.userId, role: input.role })
+        .returning();
+      return row as ProjectMemberRow;
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictError("This user is already a member of the project");
+      }
+      throw error;
+    }
   }
 
   async findByProjectAndUser(projectId: string, userId: string): Promise<ProjectMemberRow | null> {

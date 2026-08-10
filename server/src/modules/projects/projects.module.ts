@@ -1,11 +1,18 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 import { DATABASE_CONNECTION } from "../../core/database/database.tokens";
 import type { Database } from "../../core/database/client";
+import { AuthModule } from "../auth/auth.module";
+import { KnowledgeModule } from "../knowledge/knowledge.module";
+import { UsersModule } from "../users/users.module";
 import { DrizzleProjectsRepository } from "./repositories/projects.repository";
 import { DrizzleProjectMembersRepository } from "./repositories/project-members.repository";
 import { PROJECT_MEMBERS_REPOSITORY, PROJECTS_REPOSITORY } from "./projects.tokens";
+import { ProjectsController } from "./projects.controller";
+import { ProjectsService } from "./projects.service";
 
 @Module({
+  imports: [forwardRef(() => AuthModule), UsersModule, KnowledgeModule],
+  controllers: [ProjectsController],
   providers: [
     {
       provide: PROJECTS_REPOSITORY,
@@ -17,6 +24,7 @@ import { PROJECT_MEMBERS_REPOSITORY, PROJECTS_REPOSITORY } from "./projects.toke
       useFactory: (db: Database) => new DrizzleProjectMembersRepository(db),
       inject: [DATABASE_CONNECTION],
     },
+    ProjectsService,
   ],
   exports: [PROJECTS_REPOSITORY, PROJECT_MEMBERS_REPOSITORY],
 })

@@ -9,6 +9,9 @@ export const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   APP_DATABASE_URL: z.string().min(1, "APP_DATABASE_URL is required"),
+  // Backs the BullMQ job queue (ADR-003) shared by the API process (producer) and the
+  // separate worker process (consumer) -- see modules/orchestrator.
+  REDIS_URL: z.string().min(1, "REDIS_URL is required"),
   CORS_ORIGINS: z
     .string()
     .default("")

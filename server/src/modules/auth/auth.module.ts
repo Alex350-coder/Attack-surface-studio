@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
 import { DATABASE_CONNECTION } from "../../core/database/database.tokens";
 import type { Database } from "../../core/database/client";
@@ -17,7 +17,7 @@ import { RolesGuard } from "./guards/roles.guard";
  * because access and refresh tokens are signed with two different secrets.
  */
 @Module({
-  imports: [JwtModule.register({}), ProjectsModule, UsersModule],
+  imports: [JwtModule.register({}), forwardRef(() => ProjectsModule), UsersModule],
   controllers: [AuthController],
   providers: [
     {

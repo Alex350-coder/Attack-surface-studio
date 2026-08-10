@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, unique, index } from "drizzle-orm/pg-core";
 import { projects } from "./projects";
 import { users } from "./users";
 
@@ -15,5 +15,8 @@ export const projectMembers = pgTable(
     role: text("role").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [unique("project_members_project_user_unique").on(table.projectId, table.userId)],
+  (table) => [
+    unique("project_members_project_user_unique").on(table.projectId, table.userId),
+    index("project_members_user_idx").on(table.userId),
+  ],
 );

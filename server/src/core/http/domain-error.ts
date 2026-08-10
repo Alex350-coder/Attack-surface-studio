@@ -36,3 +36,13 @@ export class ForbiddenError extends DomainError {
   readonly code = "FORBIDDEN";
   readonly httpStatus = 403;
 }
+
+/**
+ * A run target fell outside the project's authorized scope (SECURITY_MODEL.md "Enforce scope
+ * before execution", EXE-003). Raised both at enqueue time and again by the worker at
+ * execution time, since a project's scope can change between the two.
+ */
+export class ScopeViolationError extends DomainError {
+  readonly code = "SCOPE_VIOLATION";
+  readonly httpStatus = 403;
+}

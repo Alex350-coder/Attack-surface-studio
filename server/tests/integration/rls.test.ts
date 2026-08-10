@@ -108,6 +108,26 @@ describe("Row-Level Security", () => {
     expect(visibleIds).toContain(projectB.id);
   });
 
+  it("creates a project and its owner membership through the app role via create_project_with_owner (ADR-010)", async () => {
+    const usersRepo = new DrizzleUsersRepository(ownerDb);
+    const user = await usersRepo.create({ email: "adr010@example.com", passwordHash: "hash" });
+
+    const created = await appDb.transaction(async (tx) => {
+      await tx.execute(sql`select set_config('app.current_user_id', ${user.id}, true)`);
+      return new DrizzleProjectsRepository(tx).createWithOwner({
+        name: "ADR-010 Project",
+        slug: "adr-010-project",
+        createdBy: user.id,
+      });
+    });
+
+    expect(created.name).toBe("ADR-010 Project");
+
+    const membersRepo = new DrizzleProjectMembersRepository(ownerDb);
+    const membership = await membersRepo.findByProjectAndUser(created.id, user.id);
+    expect(membership?.role).toBe("owner");
+  });
+
   it("blocks a member from updating another project's row through the app role", async () => {
     const { projectB, userA } = await createFixtures();
 
