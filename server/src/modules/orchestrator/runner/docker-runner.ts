@@ -1,7 +1,10 @@
 import { PassThrough } from "node:stream";
+import { Logger } from "@nestjs/common";
 import Docker from "dockerode";
 import { BoundedBuffer } from "./bounded-buffer";
 import type { Runner, RunnerOptions, RunResult } from "./runner.contract";
+
+const logger = new Logger("DockerRunner");
 
 const MAX_CAPTURED_BYTES = 5 * 1024 * 1024;
 const STOP_GRACE_SECONDS = 5;
@@ -69,7 +72,17 @@ export class DockerRunner implements Runner {
     await container.start();
 
     const stopContainer = () => {
-      container.stop({ t: STOP_GRACE_SECONDS }).catch(() => undefined);
+      container.stop({ t: STOP_GRACE_SECONDS }).catch((error: unknown) => {
+        // 304 ("container already stopped") is an expected race with the tool exiting on its
+        // own -- anything else means the graceful stop failed and we must force-kill so the
+        // container can never outlive the run (EXE-006/EXE-007: no orphaned tool containers).
+        const statusCode = (error as { statusCode?: number } | undefined)?.statusCode;
+        if (statusCode === 304) return;
+        logger.warn(`container.stop() failed, forcing kill: ${String(error)}`);
+        container.kill().catch((killError: unknown) => {
+          logger.error(`container.kill() also failed -- container may be orphaned: ${String(killError)}`);
+        });
+      });
     };
     const timeoutHandle = setTimeout(() => {
       timedOut = true;

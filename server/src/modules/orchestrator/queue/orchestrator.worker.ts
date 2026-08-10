@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { Worker, type Job } from "bullmq";
 import type IORedis from "ioredis";
 import { createRedisConnection } from "../../../core/queue/redis-connection";
@@ -20,6 +21,16 @@ import { ScopeViolationError, NotFoundError } from "../../../core/http/domain-er
 import { getRetryDecision, shouldRetry } from "../retry-policy";
 import type { RunJobData, RunJobResult } from "./run-job.types";
 
+/** Caps how much raw stdout/stderr gets attached to a failed run's `error` field for audit. */
+const RAW_OUTPUT_EXCERPT_BYTES = 8 * 1024;
+
+function excerpt(text: string): string {
+  const buf = Buffer.from(text, "utf8");
+  return buf.length <= RAW_OUTPUT_EXCERPT_BYTES
+    ? text
+    : `${buf.subarray(0, RAW_OUTPUT_EXCERPT_BYTES).toString("utf8")}\n[truncated]`;
+}
+
 /**
  * The worker process's side of the job queue: claims a queued run, re-validates its target's
  * scope (a project's scope can change between enqueue and execution -- EXE-003), executes it via
@@ -27,6 +38,7 @@ import type { RunJobData, RunJobResult } from "./run-job.types";
  * updates (OWA-020) so a concurrent cancel signal can never be clobbered by a late success write.
  */
 export class OrchestratorWorker {
+  private readonly logger = new Logger(OrchestratorWorker.name);
   private readonly worker: Worker<RunJobData, RunJobResult>;
   private readonly subscriber: IORedis;
 
@@ -43,49 +55,60 @@ export class OrchestratorWorker {
       (job) => this.process(job),
       { connection: connectionOptions },
     );
+
+    // See OrchestratorQueue for why these listeners are required: an unhandled "error" event
+    // on an EventEmitter is rethrown as an uncaught exception and would crash the worker process.
+    this.worker.on("error", (error) => this.logger.error("Worker connection error", error));
+    this.subscriber.on("error", (error) => this.logger.error("Cancel-signal subscriber connection error", error));
   }
 
   private async process(job: Job<RunJobData, RunJobResult>): Promise<RunJobResult> {
     const { runId, projectId, adapterId, executionMode, target, triggeredBy, options } = job.data;
 
-    return runWithUserContext(triggeredBy, async () => {
-      const claimed = await this.toolRunsRepository.updateStatus(
+    // Each RLS-scoped write below runs in its OWN short-lived transaction (runWithUserContext
+    // opens/commits one per call), rather than one transaction spanning the whole job. Wrapping
+    // the entire run (which can take from milliseconds to the adapter's full timeout) in a single
+    // transaction would hold a row lock on this `tool_runs` row for that entire duration: the
+    // "running" write would stay uncommitted and invisible to pollers, and a concurrent
+    // `cancelRun` UPDATE would block on that lock instead of taking effect immediately.
+    const claimed = await runWithUserContext(triggeredBy, () =>
+      this.toolRunsRepository.updateStatus(
         projectId,
         runId,
         { status: "running", startedAt: new Date() },
         ["queued"],
-      );
-      if (!claimed) {
-        // Already cancelled, or a retry attempt racing a cancel -- nothing left to do.
-        return { status: "cancelled" };
-      }
+      ),
+    );
+    if (!claimed) {
+      // Already cancelled, or a retry attempt racing a cancel -- nothing left to do.
+      return { status: "cancelled" };
+    }
 
-      const channel = runCancelChannel(runId);
-      const abortController = new AbortController();
-      const onMessage = (receivedChannel: string): void => {
-        if (receivedChannel === channel) {
-          abortController.abort();
-        }
-      };
-      await this.subscriber.subscribe(channel);
-      this.subscriber.on("message", onMessage);
-
-      try {
-        return await this.execute(job, {
-          projectId,
-          runId,
-          adapterId,
-          executionMode,
-          target,
-          triggeredBy,
-          options,
-          signal: abortController.signal,
-        });
-      } finally {
-        this.subscriber.off("message", onMessage);
-        await this.subscriber.unsubscribe(channel);
+    const channel = runCancelChannel(runId);
+    const abortController = new AbortController();
+    const onMessage = (receivedChannel: string): void => {
+      if (receivedChannel === channel) {
+        abortController.abort();
       }
-    });
+    };
+    await this.subscriber.subscribe(channel);
+    this.subscriber.on("message", onMessage);
+
+    try {
+      return await this.execute(job, {
+        projectId,
+        runId,
+        adapterId,
+        executionMode,
+        target,
+        triggeredBy,
+        options,
+        signal: abortController.signal,
+      });
+    } finally {
+      this.subscriber.off("message", onMessage);
+      await this.subscriber.unsubscribe(channel);
+    }
   }
 
   private async execute(
@@ -102,9 +125,10 @@ export class OrchestratorWorker {
     },
   ): Promise<RunJobResult> {
     const { projectId, runId, adapterId, executionMode, target, triggeredBy, options, signal } = input;
+    let capturedOutput: { stdout: string; stderr: string } | undefined;
 
     try {
-      const project = await this.projectsRepository.findById(projectId);
+      const project = await runWithUserContext(triggeredBy, () => this.projectsRepository.findById(projectId));
       if (!project) {
         throw new NotFoundError(`Project ${projectId} not found`);
       }
@@ -134,13 +158,20 @@ export class OrchestratorWorker {
         signal,
       });
       const durationMs = Date.now() - startedAt;
+      capturedOutput = { stdout: result.stdout, stderr: result.stderr };
 
       if (result.cancelled) {
-        await this.markTerminal(projectId, runId, "cancelled");
+        await this.markTerminal(triggeredBy, projectId, runId, "cancelled");
         return { status: "cancelled" };
       }
       if (result.timedOut) {
         throw new ExecutionTimeoutError(`Adapter "${adapterId}" timed out after ${invocation.timeoutMs}ms`);
+      }
+      if (result.exitCode === null) {
+        // The process never started (e.g. ENOENT -- the binary isn't on PATH). This is
+        // indistinguishable from "tool not available" and, unlike a non-zero exit, will never
+        // succeed on retry, so it must not be collapsed into the retryable NON_ZERO_EXIT path.
+        throw new ToolNotAvailableError(`Adapter "${adapterId}" failed to start: ${result.stderr.trim()}`);
       }
       if (result.exitCode !== 0) {
         throw new NonZeroExitError(`Adapter "${adapterId}" exited with code ${String(result.exitCode)}`);
@@ -153,66 +184,102 @@ export class OrchestratorWorker {
       });
       const delta = await adapter.normalize(parsed, ctx);
 
-      await this.toolRunsRepository.updateStatus(
-        projectId,
-        runId,
-        {
-          status: "succeeded",
-          finishedAt: new Date(),
-          stats: { durationMs, nodeCount: delta.nodes.length, edgeCount: delta.edges.length },
-        },
-        ["running"],
+      const updated = await runWithUserContext(triggeredBy, () =>
+        this.toolRunsRepository.updateStatus(
+          projectId,
+          runId,
+          {
+            status: "succeeded",
+            finishedAt: new Date(),
+            stats: { durationMs, nodeCount: delta.nodes.length, edgeCount: delta.edges.length },
+          },
+          ["running"],
+        ),
       );
+      if (!updated) {
+        // The row was already moved out of "running" by a concurrent cancel -- the run genuinely
+        // finished, but its outcome as tracked in `tool_runs` is "cancelled", not "succeeded".
+        this.logger.warn(`Run ${runId} succeeded but was concurrently cancelled; reporting cancelled`);
+        return { status: "cancelled" };
+      }
       return { status: "succeeded" };
     } catch (error) {
-      return this.handleFailure(job, projectId, runId, error);
+      return this.handleFailure(job, triggeredBy, projectId, runId, error, capturedOutput);
     }
   }
 
   private async handleFailure(
     job: Job<RunJobData, RunJobResult>,
+    triggeredBy: string,
     projectId: string,
     runId: string,
     error: unknown,
+    capturedOutput?: { stdout: string; stderr: string },
   ): Promise<RunJobResult> {
+    // Raw stdout/stderr are attached (bounded) to the persisted error only for the codes where
+    // they carry investigation value -- a non-zero exit or output the adapter couldn't parse.
+    // Claude.md's "raw outputs are kept for traceability" principle otherwise had no home: the
+    // ProcessRunner/DockerRunner output was captured in memory and then discarded on failure.
+    const rawOutput =
+      capturedOutput && error instanceof AdapterError && (error.code === "NON_ZERO_EXIT" || error.code === "UNPARSEABLE_OUTPUT")
+        ? { stdout: excerpt(capturedOutput.stdout), stderr: excerpt(capturedOutput.stderr) }
+        : undefined;
+
     if (error instanceof AdapterError) {
       const attemptNumber = job.attemptsMade + 1;
       if (shouldRetry(error.code, attemptNumber)) {
-        await this.toolRunsRepository.updateStatus(projectId, runId, { status: "queued" }, ["running"]);
+        const requeued = await runWithUserContext(triggeredBy, () =>
+          this.toolRunsRepository.updateStatus(projectId, runId, { status: "queued" }, ["running"]),
+        );
+        if (!requeued) {
+          // Row already left "running" (e.g. a concurrent cancel) -- don't let BullMQ retry a
+          // run that's no longer ours to retry.
+          this.logger.warn(`Run ${runId} was concurrently cancelled while a retry was being scheduled`);
+          return { status: "cancelled" };
+        }
         throw error;
       }
       const decision = getRetryDecision(error.code);
-      await this.markTerminal(projectId, runId, "failed", {
+      await this.markTerminal(triggeredBy, projectId, runId, "failed", {
         code: error.code,
         message: error.message,
         attempts: attemptNumber,
         maxAttempts: decision.maxAttempts,
+        ...(rawOutput ? { rawOutput } : {}),
       });
       return { status: "failed" };
     }
 
     if (error instanceof ScopeViolationError || error instanceof NotFoundError) {
-      await this.markTerminal(projectId, runId, "failed", { code: error.code, message: error.message });
+      await this.markTerminal(triggeredBy, projectId, runId, "failed", { code: error.code, message: error.message });
       return { status: "failed" };
     }
 
     const message = error instanceof Error ? error.message : String(error);
-    await this.markTerminal(projectId, runId, "failed", { code: "UNKNOWN", message });
+    await this.markTerminal(triggeredBy, projectId, runId, "failed", { code: "UNKNOWN", message });
     return { status: "failed" };
   }
 
   private async markTerminal(
+    triggeredBy: string,
     projectId: string,
     runId: string,
     status: "failed" | "cancelled",
     error?: unknown,
   ): Promise<void> {
-    await this.toolRunsRepository.updateStatus(
-      projectId,
-      runId,
-      { status, finishedAt: new Date(), ...(error !== undefined ? { error } : {}) },
-      ["running"],
+    const updated = await runWithUserContext(triggeredBy, () =>
+      this.toolRunsRepository.updateStatus(
+        projectId,
+        runId,
+        { status, finishedAt: new Date(), ...(error !== undefined ? { error } : {}) },
+        ["running"],
+      ),
     );
+    if (!updated) {
+      // The row was already moved out of "running" (e.g. by a concurrent cancel) -- the terminal
+      // write we intended to make no longer applies. Not an error, but worth a trace for audits.
+      this.logger.debug(`markTerminal(${status}) for run ${runId} was a no-op -- row already left "running"`);
+    }
   }
 
   async close(): Promise<void> {

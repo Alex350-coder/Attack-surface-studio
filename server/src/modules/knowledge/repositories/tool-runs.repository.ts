@@ -7,6 +7,11 @@ import {
   type Paginated,
   type PaginationParams,
 } from "../../shared/repository.types";
+import { canTransition, TOOL_RUN_STATUSES, type ToolRunStatus } from "../../orchestrator/tool-run-transitions";
+
+function isToolRunStatus(value: string): value is ToolRunStatus {
+  return (TOOL_RUN_STATUSES as readonly string[]).includes(value);
+}
 
 export interface ToolRunRow {
   id: string;
@@ -95,6 +100,17 @@ export class DrizzleToolRunsRepository implements ToolRunsRepository {
     update: ToolRunStatusUpdate,
     expectedCurrentStatuses?: string[],
   ): Promise<ToolRunRow | null> {
+    // Defense-in-depth (OWA-021): every caller-declared "from" status must actually be allowed
+    // to reach the target status per the state machine in `tool-run-transitions.ts`, catching a
+    // call site drifting out of sync with the allow-list before it reaches the database.
+    if (isToolRunStatus(update.status) && expectedCurrentStatuses) {
+      for (const from of expectedCurrentStatuses) {
+        if (isToolRunStatus(from) && !canTransition(from, update.status)) {
+          throw new Error(`Illegal tool_run transition: ${from} -> ${update.status}`);
+        }
+      }
+    }
+
     const conditions = [eq(toolRuns.projectId, projectId), eq(toolRuns.id, id)];
     if (expectedCurrentStatuses && expectedCurrentStatuses.length > 0) {
       conditions.push(inArray(toolRuns.status, expectedCurrentStatuses));

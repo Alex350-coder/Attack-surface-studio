@@ -11,7 +11,9 @@ const TERMINAL_STATUSES: ReadonlySet<ToolRunStatus> = new Set(["succeeded", "fai
  * status -- a finished run is finished.
  */
 const ALLOWED_TRANSITIONS: Readonly<Record<ToolRunStatus, ReadonlySet<ToolRunStatus>>> = {
-  queued: new Set<ToolRunStatus>(["running", "cancelled"]),
+  // "queued -> failed" covers the API process failing to hand a freshly-created run off to the
+  // queue (e.g. Redis unreachable) before any worker ever claims it.
+  queued: new Set<ToolRunStatus>(["running", "cancelled", "failed"]),
   running: new Set<ToolRunStatus>(["queued", "succeeded", "failed", "cancelled"]),
   succeeded: new Set<ToolRunStatus>([]),
   failed: new Set<ToolRunStatus>([]),

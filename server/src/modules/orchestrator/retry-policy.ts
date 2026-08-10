@@ -12,7 +12,9 @@ export interface RetryDecision {
  * bad input. `EXECUTION_TIMEOUT` and `NON_ZERO_EXIT` may be transient (resource contention, a
  * flaky target) and get a bounded number of retries with exponential backoff.
  * `UNPARSEABLE_OUTPUT` is left non-retryable: a tool that produced malformed output once will
- * almost certainly do so again, and the raw output is preserved for investigation instead.
+ * almost certainly do so again. A bounded excerpt of the raw stdout/stderr that failed to parse
+ * is attached to the run's `error` field by the worker (see `orchestrator.worker.ts`) so it can
+ * be inspected without retrying.
  */
 const RETRY_POLICY: Readonly<Record<AdapterErrorCode, RetryDecision>> = {
   TOOL_NOT_AVAILABLE: { retryable: false, maxAttempts: 1, backoffMs: 0 },
