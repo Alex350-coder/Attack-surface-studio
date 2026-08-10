@@ -11,6 +11,8 @@
     "build": "nest build",
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
+    "start:worker": "node dist/worker-main.js",
+    "start:worker:dev": "nest start --watch --entryFile worker-main",
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.ts\"",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
