@@ -5,6 +5,7 @@ import { projectMembers } from "./projectMembers";
 import { nodes } from "./nodes";
 import { edges } from "./edges";
 import { toolRuns } from "./toolRuns";
+import { toolConfigs } from "./toolConfigs";
 import { rawOutputs } from "./rawOutputs";
 import { evidenceFiles } from "./evidenceFiles";
 import { notes } from "./notes";
@@ -18,6 +19,7 @@ export {
   nodes,
   edges,
   toolRuns,
+  toolConfigs,
   rawOutputs,
   evidenceFiles,
   notes,
@@ -30,6 +32,7 @@ export const projectsRelations = relations(projects, ({ many, one }) => ({
   nodes: many(nodes),
   edges: many(edges),
   toolRuns: many(toolRuns),
+  toolConfigs: many(toolConfigs),
   evidenceFiles: many(evidenceFiles),
   notes: many(notes),
   reports: many(reports),
@@ -67,6 +70,10 @@ export const edgesRelations = relations(edges, ({ one }) => ({
 export const toolRunsRelations = relations(toolRuns, ({ one, many }) => ({
   project: one(projects, { fields: [toolRuns.projectId], references: [projects.id] }),
   rawOutputs: many(rawOutputs),
+}));
+
+export const toolConfigsRelations = relations(toolConfigs, ({ one }) => ({
+  project: one(projects, { fields: [toolConfigs.projectId], references: [projects.id] }),
 }));
 
 export const rawOutputsRelations = relations(rawOutputs, ({ one }) => ({

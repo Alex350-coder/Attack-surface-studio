@@ -43,6 +43,13 @@
       "when": 1786317662279,
       "tag": "0005_chief_lady_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786915874112,
+      "tag": "0006_add_tool_configs",
+      "breakpoints": true
     }
   ]
 }
