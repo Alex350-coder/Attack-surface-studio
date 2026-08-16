@@ -1,0 +1,3 @@
+{"template-id":"exposed-panel-generic","info":{"name":"Generic Exposed Admin Panel","severity":"medium","tags":["panel"]},"host":"target.example.com","matched-at":"https://target.example.com/admin"}
+[INF] some unrelated progress log line that isn't JSON at all
+{"this is": "not a valid match object, missing required fields"}

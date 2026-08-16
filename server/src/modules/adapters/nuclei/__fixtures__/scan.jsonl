@@ -1,0 +1,2 @@
+{"template-id":"exposed-panel-generic","info":{"name":"Generic Exposed Admin Panel","severity":"medium","tags":["panel","exposure"]},"host":"target.example.com","matched-at":"https://target.example.com/admin","timestamp":"2026-08-16T20:00:00Z"}
+{"template-id":"CVE-2023-99999","info":{"name":"Example Critical RCE","severity":"critical","tags":["cve","rce"]},"host":"target.example.com","matched-at":"https://target.example.com/api","timestamp":"2026-08-16T20:00:05Z"}
