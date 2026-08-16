@@ -1,0 +1,35 @@
+{
+  "commandline": "ffuf -u https://target.example.com/FUZZ -w /usr/share/wordlists/dirb/common.txt -mc 200,204,301,302,307,401,403 -of json -o -",
+  "time": "2026-08-16T20:00:00Z",
+  "results": [
+    {
+      "input": { "FUZZ": "admin" },
+      "position": 1,
+      "status": 301,
+      "length": 178,
+      "words": 9,
+      "lines": 7,
+      "content-type": "text/html",
+      "redirectlocation": "/admin/",
+      "duration": 45123000,
+      "resultfile": "",
+      "url": "https://target.example.com/admin",
+      "host": "target.example.com"
+    },
+    {
+      "input": { "FUZZ": "api" },
+      "position": 2,
+      "status": 200,
+      "length": 512,
+      "words": 40,
+      "lines": 20,
+      "content-type": "application/json",
+      "redirectlocation": "",
+      "duration": 38221000,
+      "resultfile": "",
+      "url": "https://target.example.com/api",
+      "host": "target.example.com"
+    }
+  ],
+  "config": {}
+}

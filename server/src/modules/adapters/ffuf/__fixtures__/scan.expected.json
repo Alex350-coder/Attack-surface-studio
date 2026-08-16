@@ -1,0 +1,11 @@
+{
+  "nodes": [
+    { "identityKey": "host:target.example.com", "type": "host", "category": "infrastructure", "label": "target.example.com" },
+    { "identityKey": "asset:https://target.example.com/admin", "type": "asset", "category": "artifact", "label": "https://target.example.com/admin [301]" },
+    { "identityKey": "asset:https://target.example.com/api", "type": "asset", "category": "artifact", "label": "https://target.example.com/api [200]" }
+  ],
+  "edges": [
+    { "sourceIdentityKey": "host:target.example.com", "targetIdentityKey": "asset:https://target.example.com/admin", "type": "discovery" },
+    { "sourceIdentityKey": "host:target.example.com", "targetIdentityKey": "asset:https://target.example.com/api", "type": "discovery" }
+  ]
+}
