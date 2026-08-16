@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet href="file:///usr/share/nmap/nmap.xsl" type="text/xsl"?>
+<nmaprun scanner="nmap" args="nmap -sT -sV -O -oX - 198.51.100.10" start="1732000000" version="7.95">
+  <host starttime="1732000000" endtime="1732000010">
+    <status state="up" reason="syn-ack" reason_ttl="64"/>
+    <address addr="198.51.100.10" addrtype="ipv4"/>
+    <hostnames>
+      <hostname name="scanme.example.com" type="user"/>
+    </hostnames>
+    <ports>
+      <port protocol="tcp" portid="22">
+        <state state="open" reason="syn-ack" reason_ttl="64"/>
+        <service name="ssh" product="OpenSSH" version="8.9p1" method="probed" conf="10"/>
+      </port>
+      <port protocol="tcp" portid="80">
+        <state state="open" reason="syn-ack" reason_ttl="64"/>
+        <service name="http" product="nginx" version="1.24.0" method="probed" conf="10"/>
+      </port>
+      <port protocol="tcp" portid="443">
+        <state state="closed" reason="reset" reason_ttl="64"/>
+        <service name="https" method="table" conf="3"/>
+      </port>
+    </ports>
+    <os>
+      <osmatch name="Linux 5.15 - 6.1" accuracy="93"/>
+      <osmatch name="Linux 4.15 - 5.6" accuracy="88"/>
+    </os>
+  </host>
+  <host starttime="1732000010" endtime="1732000012">
+    <status state="down" reason="no-response" reason_ttl="0"/>
+    <address addr="198.51.100.11" addrtype="ipv4"/>
+  </host>
+</nmaprun>

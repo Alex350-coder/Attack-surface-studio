@@ -1,0 +1,19 @@
+{
+  "nodes": [
+    { "identityKey": "ip:198.51.100.10", "type": "ip", "category": "infrastructure", "label": "198.51.100.10" },
+    { "identityKey": "host:scanme.example.com", "type": "host", "category": "infrastructure", "label": "scanme.example.com" },
+    { "identityKey": "os:scanme.example.com", "type": "os", "category": "infrastructure", "label": "Linux 5.15 - 6.1" },
+    { "identityKey": "host:scanme.example.com:22", "type": "port", "category": "infrastructure", "label": "22/tcp" },
+    { "identityKey": "service:scanme.example.com:22", "type": "service", "category": "infrastructure", "label": "ssh OpenSSH 8.9p1" },
+    { "identityKey": "host:scanme.example.com:80", "type": "port", "category": "infrastructure", "label": "80/tcp" },
+    { "identityKey": "service:scanme.example.com:80", "type": "service", "category": "infrastructure", "label": "http nginx 1.24.0" }
+  ],
+  "edges": [
+    { "sourceIdentityKey": "host:scanme.example.com", "targetIdentityKey": "ip:198.51.100.10", "type": "relationship", "label": "resolves to" },
+    { "sourceIdentityKey": "ip:198.51.100.10", "targetIdentityKey": "os:scanme.example.com", "type": "relationship", "label": "runs" },
+    { "sourceIdentityKey": "ip:198.51.100.10", "targetIdentityKey": "host:scanme.example.com:22", "type": "discovery" },
+    { "sourceIdentityKey": "host:scanme.example.com:22", "targetIdentityKey": "service:scanme.example.com:22", "type": "relationship", "label": "runs" },
+    { "sourceIdentityKey": "ip:198.51.100.10", "targetIdentityKey": "host:scanme.example.com:80", "type": "discovery" },
+    { "sourceIdentityKey": "host:scanme.example.com:80", "targetIdentityKey": "service:scanme.example.com:80", "type": "relationship", "label": "runs" }
+  ]
+}

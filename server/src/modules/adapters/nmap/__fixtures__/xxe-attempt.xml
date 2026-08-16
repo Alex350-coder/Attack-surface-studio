@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun [
+  <!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<nmaprun scanner="nmap" args="nmap -oX - 198.51.100.10" version="7.95">
+  <host>
+    <status state="up" reason="syn-ack" reason_ttl="64"/>
+    <address addr="198.51.100.10" addrtype="ipv4"/>
+    <hostnames>
+      <hostname name="&xxe;" type="user"/>
+    </hostnames>
+  </host>
+</nmaprun>
