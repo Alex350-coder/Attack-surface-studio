@@ -1,0 +1,11 @@
+{
+  "nodes": [
+    { "identityKey": "host:target.example.com", "type": "host", "category": "infrastructure", "label": "target.example.com" },
+    { "identityKey": "finding:target.example.com:exposed-panel-generic", "type": "finding", "category": "security", "label": "Generic Exposed Admin Panel", "severity": "warning" },
+    { "identityKey": "finding:target.example.com:CVE-2023-99999", "type": "criticalFinding", "category": "security", "label": "Example Critical RCE", "severity": "critical" }
+  ],
+  "edges": [
+    { "sourceIdentityKey": "host:target.example.com", "targetIdentityKey": "finding:target.example.com:exposed-panel-generic", "type": "risk" },
+    { "sourceIdentityKey": "host:target.example.com", "targetIdentityKey": "finding:target.example.com:CVE-2023-99999", "type": "risk" }
+  ]
+}
