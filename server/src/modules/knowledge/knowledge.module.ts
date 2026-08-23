@@ -9,9 +9,13 @@ import { DrizzleRawOutputsRepository } from "./repositories/raw-outputs.reposito
 import { DrizzleEvidenceFilesRepository } from "./repositories/evidence-files.repository";
 import { DrizzleNotesRepository } from "./repositories/notes.repository";
 import { DrizzleReportsRepository } from "./repositories/reports.repository";
+import { GraphBuilderService } from "./graph-builder.service";
+import type { EdgesRepository } from "./repositories/edges.repository";
+import type { NodesRepository } from "./repositories/nodes.repository";
 import {
   EDGES_REPOSITORY,
   EVIDENCE_FILES_REPOSITORY,
+  GRAPH_BUILDER,
   GRAPH_TRAVERSAL_REPOSITORY,
   NODES_REPOSITORY,
   NOTES_REPOSITORY,
@@ -73,7 +77,13 @@ const REPOSITORY_TOKENS = [
       useFactory: (db: Database) => new DrizzleReportsRepository(db),
       inject: [DATABASE_CONNECTION],
     },
+    {
+      provide: GRAPH_BUILDER,
+      useFactory: (nodesRepository: NodesRepository, edgesRepository: EdgesRepository) =>
+        new GraphBuilderService(nodesRepository, edgesRepository),
+      inject: [NODES_REPOSITORY, EDGES_REPOSITORY],
+    },
   ],
-  exports: REPOSITORY_TOKENS,
+  exports: [...REPOSITORY_TOKENS, GRAPH_BUILDER],
 })
 export class KnowledgeModule {}
