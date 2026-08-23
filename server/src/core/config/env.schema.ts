@@ -12,6 +12,10 @@ export const envSchema = z.object({
   // Backs the BullMQ job queue (ADR-003) shared by the API process (producer) and the
   // separate worker process (consumer) -- see modules/orchestrator.
   REDIS_URL: z.string().min(1, "REDIS_URL is required"),
+  // Local filesystem root for content-addressable blob storage (core/storage) -- raw tool
+  // output and evidence file bytes (DATA_MODEL.md `raw_outputs`/`evidence_files`). Must live
+  // outside any web-served directory (SEC-051).
+  STORAGE_ROOT: z.string().min(1, "STORAGE_ROOT is required"),
   CORS_ORIGINS: z
     .string()
     .default("")

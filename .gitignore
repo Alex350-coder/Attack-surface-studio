@@ -16,6 +16,9 @@ out/
 # Test coverage reports
 coverage/
 
+# Local blob storage (STORAGE_ROOT) -- raw tool output / evidence file bytes, never committed
+server/data/
+
 # Logs
 *.log
 npm-debug.log*
