@@ -5,6 +5,7 @@ import { DrizzleNodesRepository } from "./repositories/nodes.repository";
 import { DrizzleEdgesRepository } from "./repositories/edges.repository";
 import { DrizzleGraphTraversalRepository } from "./repositories/graph-traversal.repository";
 import { DrizzleToolRunsRepository } from "./repositories/tool-runs.repository";
+import { DrizzleRawOutputsRepository } from "./repositories/raw-outputs.repository";
 import { DrizzleEvidenceFilesRepository } from "./repositories/evidence-files.repository";
 import { DrizzleNotesRepository } from "./repositories/notes.repository";
 import { DrizzleReportsRepository } from "./repositories/reports.repository";
@@ -14,6 +15,7 @@ import {
   GRAPH_TRAVERSAL_REPOSITORY,
   NODES_REPOSITORY,
   NOTES_REPOSITORY,
+  RAW_OUTPUTS_REPOSITORY,
   REPORTS_REPOSITORY,
   TOOL_RUNS_REPOSITORY,
 } from "./knowledge.tokens";
@@ -23,6 +25,7 @@ const REPOSITORY_TOKENS = [
   EDGES_REPOSITORY,
   GRAPH_TRAVERSAL_REPOSITORY,
   TOOL_RUNS_REPOSITORY,
+  RAW_OUTPUTS_REPOSITORY,
   EVIDENCE_FILES_REPOSITORY,
   NOTES_REPOSITORY,
   REPORTS_REPOSITORY,
@@ -48,6 +51,11 @@ const REPOSITORY_TOKENS = [
     {
       provide: TOOL_RUNS_REPOSITORY,
       useFactory: (db: Database) => new DrizzleToolRunsRepository(db),
+      inject: [DATABASE_CONNECTION],
+    },
+    {
+      provide: RAW_OUTPUTS_REPOSITORY,
+      useFactory: (db: Database) => new DrizzleRawOutputsRepository(db),
       inject: [DATABASE_CONNECTION],
     },
     {
