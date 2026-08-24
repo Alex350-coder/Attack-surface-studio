@@ -257,6 +257,15 @@ describe("Orchestrator flows (tool run lifecycle via /api/v1/projects/:id/runs*)
     const stats = finished.stats as { nodeCount: number; edgeCount: number };
     expect(stats.nodeCount).toBeGreaterThan(0);
     expect(stats.edgeCount).toBeGreaterThanOrEqual(0);
+
+    // The GraphBuilderService actually persisted the run's delta -- not just counted it.
+    const graphRes = await request(server())
+      .get(`/api/v1/projects/${project.id}/graph`)
+      .set("Authorization", `Bearer ${owner.accessToken}`);
+    expect(graphRes.status).toBe(200);
+    const graph = dataOf<{ nodes: { total: number }; edges: { total: number } }>(graphRes);
+    expect(graph.nodes.total).toBe(stats.nodeCount);
+    expect(graph.edges.total).toBe(stats.edgeCount);
   }, 30_000);
 
   it("rejects an out-of-scope target at enqueue time and never creates a run", async () => {
