@@ -7,6 +7,7 @@ import type { EnvConfig } from "./core/config/env.schema";
 import { LoggingModule } from "./core/logging/logging.module";
 import { DatabaseModule } from "./core/database/database.module";
 import { QueueModule } from "./core/queue/queue.module";
+import { StorageModule } from "./core/storage/storage.module";
 import { CorrelationIdMiddleware } from "./core/middleware/correlation-id.middleware";
 import { RlsContextMiddleware } from "./core/http/rls-context.middleware";
 import { HealthModule } from "./modules/health/health.module";
@@ -25,6 +26,7 @@ import { AssistantModule } from "./modules/assistant/assistant.module";
     LoggingModule,
     DatabaseModule,
     QueueModule,
+    StorageModule,
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService<EnvConfig, true>) => [

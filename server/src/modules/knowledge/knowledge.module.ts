@@ -1,19 +1,30 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
+import { AuthModule } from "../auth/auth.module";
+import { ProjectsModule } from "../projects/projects.module";
+import { StorageModule } from "../../core/storage/storage.module";
 import { DATABASE_CONNECTION } from "../../core/database/database.tokens";
 import type { Database } from "../../core/database/client";
 import { DrizzleNodesRepository } from "./repositories/nodes.repository";
 import { DrizzleEdgesRepository } from "./repositories/edges.repository";
 import { DrizzleGraphTraversalRepository } from "./repositories/graph-traversal.repository";
 import { DrizzleToolRunsRepository } from "./repositories/tool-runs.repository";
+import { DrizzleRawOutputsRepository } from "./repositories/raw-outputs.repository";
 import { DrizzleEvidenceFilesRepository } from "./repositories/evidence-files.repository";
 import { DrizzleNotesRepository } from "./repositories/notes.repository";
 import { DrizzleReportsRepository } from "./repositories/reports.repository";
+import { GraphBuilderService } from "./graph-builder.service";
+import { KnowledgeController } from "./knowledge.controller";
+import { KnowledgeService } from "./knowledge.service";
+import type { EdgesRepository } from "./repositories/edges.repository";
+import type { NodesRepository } from "./repositories/nodes.repository";
 import {
   EDGES_REPOSITORY,
   EVIDENCE_FILES_REPOSITORY,
+  GRAPH_BUILDER,
   GRAPH_TRAVERSAL_REPOSITORY,
   NODES_REPOSITORY,
   NOTES_REPOSITORY,
+  RAW_OUTPUTS_REPOSITORY,
   REPORTS_REPOSITORY,
   TOOL_RUNS_REPOSITORY,
 } from "./knowledge.tokens";
@@ -23,13 +34,17 @@ const REPOSITORY_TOKENS = [
   EDGES_REPOSITORY,
   GRAPH_TRAVERSAL_REPOSITORY,
   TOOL_RUNS_REPOSITORY,
+  RAW_OUTPUTS_REPOSITORY,
   EVIDENCE_FILES_REPOSITORY,
   NOTES_REPOSITORY,
   REPORTS_REPOSITORY,
 ];
 
 @Module({
+  imports: [forwardRef(() => AuthModule), forwardRef(() => ProjectsModule), StorageModule],
+  controllers: [KnowledgeController],
   providers: [
+    KnowledgeService,
     {
       provide: NODES_REPOSITORY,
       useFactory: (db: Database) => new DrizzleNodesRepository(db),
@@ -51,6 +66,11 @@ const REPOSITORY_TOKENS = [
       inject: [DATABASE_CONNECTION],
     },
     {
+      provide: RAW_OUTPUTS_REPOSITORY,
+      useFactory: (db: Database) => new DrizzleRawOutputsRepository(db),
+      inject: [DATABASE_CONNECTION],
+    },
+    {
       provide: EVIDENCE_FILES_REPOSITORY,
       useFactory: (db: Database) => new DrizzleEvidenceFilesRepository(db),
       inject: [DATABASE_CONNECTION],
@@ -65,7 +85,13 @@ const REPOSITORY_TOKENS = [
       useFactory: (db: Database) => new DrizzleReportsRepository(db),
       inject: [DATABASE_CONNECTION],
     },
+    {
+      provide: GRAPH_BUILDER,
+      useFactory: (nodesRepository: NodesRepository, edgesRepository: EdgesRepository) =>
+        new GraphBuilderService(nodesRepository, edgesRepository),
+      inject: [NODES_REPOSITORY, EDGES_REPOSITORY],
+    },
   ],
-  exports: REPOSITORY_TOKENS,
+  exports: [...REPOSITORY_TOKENS, GRAPH_BUILDER],
 })
 export class KnowledgeModule {}

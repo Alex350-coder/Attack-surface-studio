@@ -6,6 +6,7 @@ const REQUIRED_VARS = {
   APP_DATABASE_URL: "postgresql://user:pass@localhost:5432/db",
   JWT_ACCESS_SECRET: "a".repeat(32),
   REDIS_URL: "redis://localhost:6379",
+  STORAGE_ROOT: "./data/blobs",
 };
 
 describe("validateEnv", () => {

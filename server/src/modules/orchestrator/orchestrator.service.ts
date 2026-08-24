@@ -3,8 +3,11 @@ import { ConflictError, NotFoundError, ScopeViolationError } from "../../core/ht
 import type { Paginated, PaginationParams } from "../shared/repository.types";
 import { PROJECTS_REPOSITORY } from "../projects/projects.tokens";
 import type { ProjectRow, ProjectsRepository } from "../projects/repositories/projects.repository";
-import { TOOL_RUNS_REPOSITORY } from "../knowledge/knowledge.tokens";
+import { RAW_OUTPUTS_REPOSITORY, TOOL_RUNS_REPOSITORY } from "../knowledge/knowledge.tokens";
 import type { ToolRunRow, ToolRunsRepository } from "../knowledge/repositories/tool-runs.repository";
+import type { RawOutputsRepository } from "../knowledge/repositories/raw-outputs.repository";
+import { BLOB_STORAGE } from "../../core/storage/storage.tokens";
+import type { BlobStorage } from "../../core/storage/blob-storage.contract";
 import { isTargetInScope } from "./scope/scope-matcher";
 import { isTerminalStatus, type ToolRunStatus } from "./tool-run-transitions";
 import { toToolRunDto, type ToolRunDto } from "./mappers/tool-run.mapper";
@@ -20,6 +23,8 @@ export class OrchestratorService {
   constructor(
     @Inject(PROJECTS_REPOSITORY) private readonly projectsRepository: ProjectsRepository,
     @Inject(TOOL_RUNS_REPOSITORY) private readonly toolRunsRepository: ToolRunsRepository,
+    @Inject(RAW_OUTPUTS_REPOSITORY) private readonly rawOutputsRepository: RawOutputsRepository,
+    @Inject(BLOB_STORAGE) private readonly blobStorage: BlobStorage,
     @Inject(ORCHESTRATOR_QUEUE) private readonly queue: OrchestratorQueue,
   ) {}
 
@@ -92,6 +97,17 @@ export class OrchestratorService {
 
     await this.queue.requestCancel(runId);
     return toToolRunDto(updated);
+  }
+
+  /** Audit-only: raw stdout is never used to render the graph (Routes.md, SEC-052). */
+  async getRawOutput(projectId: string, runId: string): Promise<{ buffer: Buffer; format: string; byteSize: number }> {
+    await this.requireRun(projectId, runId);
+    const row = await this.rawOutputsRepository.findLatestByToolRunId(projectId, runId);
+    if (!row) {
+      throw new NotFoundError("No raw output has been captured for this run");
+    }
+    const buffer = await this.blobStorage.get(row.contentRef);
+    return { buffer, format: row.format, byteSize: row.byteSize };
   }
 
   private async requireProject(projectId: string): Promise<ProjectRow> {
