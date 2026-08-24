@@ -1,4 +1,6 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
+import { AuthModule } from "../auth/auth.module";
+import { ProjectsModule } from "../projects/projects.module";
 import { DATABASE_CONNECTION } from "../../core/database/database.tokens";
 import type { Database } from "../../core/database/client";
 import { DrizzleNodesRepository } from "./repositories/nodes.repository";
@@ -10,6 +12,8 @@ import { DrizzleEvidenceFilesRepository } from "./repositories/evidence-files.re
 import { DrizzleNotesRepository } from "./repositories/notes.repository";
 import { DrizzleReportsRepository } from "./repositories/reports.repository";
 import { GraphBuilderService } from "./graph-builder.service";
+import { KnowledgeController } from "./knowledge.controller";
+import { KnowledgeService } from "./knowledge.service";
 import type { EdgesRepository } from "./repositories/edges.repository";
 import type { NodesRepository } from "./repositories/nodes.repository";
 import {
@@ -36,7 +40,10 @@ const REPOSITORY_TOKENS = [
 ];
 
 @Module({
+  imports: [forwardRef(() => AuthModule), forwardRef(() => ProjectsModule)],
+  controllers: [KnowledgeController],
   providers: [
+    KnowledgeService,
     {
       provide: NODES_REPOSITORY,
       useFactory: (db: Database) => new DrizzleNodesRepository(db),
