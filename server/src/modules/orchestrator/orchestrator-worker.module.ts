@@ -3,13 +3,17 @@ import { ProjectsModule } from "../projects/projects.module";
 import { KnowledgeModule } from "../knowledge/knowledge.module";
 import { AdaptersModule } from "../adapters/adapters.module";
 import { PROJECTS_REPOSITORY } from "../projects/projects.tokens";
-import { TOOL_RUNS_REPOSITORY } from "../knowledge/knowledge.tokens";
+import { GRAPH_BUILDER, RAW_OUTPUTS_REPOSITORY, TOOL_RUNS_REPOSITORY } from "../knowledge/knowledge.tokens";
 import { ADAPTER_REGISTRY } from "../adapters/adapters.tokens";
 import type { ProjectsRepository } from "../projects/repositories/projects.repository";
 import type { ToolRunsRepository } from "../knowledge/repositories/tool-runs.repository";
+import type { RawOutputsRepository } from "../knowledge/repositories/raw-outputs.repository";
+import type { GraphBuilderService } from "../knowledge/graph-builder.service";
 import type { AdapterRegistry } from "../adapters/adapter.registry";
 import { QUEUE_CONNECTION_OPTIONS } from "../../core/queue/queue.tokens";
 import type { QueueConnectionOptions } from "../../core/queue/redis-connection";
+import { BLOB_STORAGE } from "../../core/storage/storage.tokens";
+import type { BlobStorage } from "../../core/storage/blob-storage.contract";
 import { ProcessRunner } from "./runner/process-runner";
 import { DockerRunner } from "./runner/docker-runner";
 import { RunnerService } from "./runner/runner.service";
@@ -41,8 +45,30 @@ import { ORCHESTRATOR_WORKER } from "./orchestrator.tokens";
         runner: RunnerSelector,
         toolRunsRepository: ToolRunsRepository,
         projectsRepository: ProjectsRepository,
-      ) => new OrchestratorWorker(connectionOptions, adapterRegistry, runner, toolRunsRepository, projectsRepository),
-      inject: [QUEUE_CONNECTION_OPTIONS, ADAPTER_REGISTRY, RUNNER_SELECTOR, TOOL_RUNS_REPOSITORY, PROJECTS_REPOSITORY],
+        graphBuilder: GraphBuilderService,
+        rawOutputsRepository: RawOutputsRepository,
+        blobStorage: BlobStorage,
+      ) =>
+        new OrchestratorWorker(
+          connectionOptions,
+          adapterRegistry,
+          runner,
+          toolRunsRepository,
+          projectsRepository,
+          graphBuilder,
+          rawOutputsRepository,
+          blobStorage,
+        ),
+      inject: [
+        QUEUE_CONNECTION_OPTIONS,
+        ADAPTER_REGISTRY,
+        RUNNER_SELECTOR,
+        TOOL_RUNS_REPOSITORY,
+        PROJECTS_REPOSITORY,
+        GRAPH_BUILDER,
+        RAW_OUTPUTS_REPOSITORY,
+        BLOB_STORAGE,
+      ],
     },
   ],
   exports: [ORCHESTRATOR_WORKER],

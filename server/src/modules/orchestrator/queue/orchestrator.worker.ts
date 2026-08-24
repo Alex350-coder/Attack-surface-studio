@@ -15,6 +15,9 @@ import {
 } from "../../adapters/adapter.contract";
 import type { ProjectsRepository } from "../../projects/repositories/projects.repository";
 import type { ToolRunsRepository } from "../../knowledge/repositories/tool-runs.repository";
+import type { RawOutputsRepository } from "../../knowledge/repositories/raw-outputs.repository";
+import type { GraphBuilderService } from "../../knowledge/graph-builder.service";
+import type { BlobStorage } from "../../../core/storage/blob-storage.contract";
 import type { RunnerSelector } from "../runner/runner.contract";
 import { isTargetInScope } from "../scope/scope-matcher";
 import { ScopeViolationError, NotFoundError } from "../../../core/http/domain-error";
@@ -48,6 +51,9 @@ export class OrchestratorWorker {
     private readonly runner: RunnerSelector,
     private readonly toolRunsRepository: ToolRunsRepository,
     private readonly projectsRepository: ProjectsRepository,
+    private readonly graphBuilder: GraphBuilderService,
+    private readonly rawOutputsRepository: RawOutputsRepository,
+    private readonly blobStorage: BlobStorage,
   ) {
     this.subscriber = createRedisConnection();
     this.worker = new Worker<RunJobData, RunJobResult>(
@@ -183,6 +189,24 @@ export class OrchestratorWorker {
         exitCode: result.exitCode,
       });
       const delta = await adapter.normalize(parsed, ctx);
+
+      // Everything a run discovers enriches the graph (Claude.md §9) -- this is the one call
+      // site where a GraphDelta produced by a tool run actually gets persisted.
+      await runWithUserContext(triggeredBy, () => this.graphBuilder.applyDelta(projectId, delta, { sourceRunId: runId }));
+
+      // Raw stdout is kept as the durable audit trail behind the normalized graph (Claude.md
+      // "raw outputs are kept for traceability"), content-addressed so re-running an identical
+      // scan never duplicates bytes on disk.
+      const stdoutBlob = await this.blobStorage.put(Buffer.from(result.stdout, "utf8"));
+      await runWithUserContext(triggeredBy, () =>
+        this.rawOutputsRepository.create({
+          toolRunId: runId,
+          format: "stdout",
+          contentRef: stdoutBlob.ref,
+          contentHash: stdoutBlob.hash,
+          byteSize: stdoutBlob.byteSize,
+        }),
+      );
 
       const updated = await runWithUserContext(triggeredBy, () =>
         this.toolRunsRepository.updateStatus(
