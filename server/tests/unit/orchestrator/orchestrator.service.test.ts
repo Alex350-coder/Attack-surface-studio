@@ -73,7 +73,13 @@ describe("OrchestratorService", () => {
       close: vi.fn(),
     } as unknown as Mocked<OrchestratorQueue>;
 
-    service = new OrchestratorService(projectsRepository, toolRunsRepository, queue);
+    const rawOutputsRepository = {
+      create: vi.fn(),
+      findLatestByToolRunId: vi.fn(),
+    };
+    const blobStorage = { put: vi.fn(), get: vi.fn() };
+
+    service = new OrchestratorService(projectsRepository, toolRunsRepository, rawOutputsRepository, blobStorage, queue);
   });
 
   describe("enqueueRun", () => {

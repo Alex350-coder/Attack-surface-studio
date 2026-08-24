@@ -268,6 +268,37 @@ describe("Orchestrator flows (tool run lifecycle via /api/v1/projects/:id/runs*)
     expect(graph.edges.total).toBe(stats.edgeCount);
   }, 30_000);
 
+  it("serves the run's raw stdout as an attachment to admin+ and rejects non-members", async () => {
+    const owner = await registerUser("raw-output-owner");
+    const outsider = await registerUser("raw-output-outsider");
+    const project = await createProject(owner.accessToken, { name: "Raw Output Project" });
+
+    const enqueueRes = await request(server())
+      .post(`/api/v1/projects/${project.id}/runs`)
+      .set("Authorization", `Bearer ${owner.accessToken}`)
+      .send({ adapterId: "stub", executionMode: "local", target: "example.com", options: { delayMs: 10 } });
+    const created = dataOf<ToolRunBody>(enqueueRes);
+
+    const finished = await pollUntil(
+      () => getRun(owner.accessToken, project.id, created.id),
+      (run) => run.status === "succeeded" || run.status === "failed",
+    );
+    expect(finished.status).toBe("succeeded");
+
+    const rawRes = await request(server())
+      .get(`/api/v1/projects/${project.id}/runs/${created.id}/raw`)
+      .set("Authorization", `Bearer ${owner.accessToken}`);
+    expect(rawRes.status).toBe(200);
+    expect(rawRes.headers["content-disposition"]).toMatch(/^attachment;/);
+    expect(Buffer.isBuffer(rawRes.body)).toBe(true);
+    expect((rawRes.body as Buffer).length).toBeGreaterThan(0);
+
+    const outsiderRes = await request(server())
+      .get(`/api/v1/projects/${project.id}/runs/${created.id}/raw`)
+      .set("Authorization", `Bearer ${outsider.accessToken}`);
+    expect(outsiderRes.status).toBe(403);
+  }, 30_000);
+
   it("rejects an out-of-scope target at enqueue time and never creates a run", async () => {
     const owner = await registerUser("scope-owner");
     const project = await createProject(owner.accessToken, { name: "Scope Project", includes: ["example.com"] });

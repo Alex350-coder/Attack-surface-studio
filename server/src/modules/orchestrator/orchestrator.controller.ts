@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from "@nestjs/common";
-import type { Request } from "express";
+import { Body, Controller, Get, Param, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
+import type { Request, Response } from "express";
 import { UnauthorizedError } from "../../core/http/domain-error";
 import { ZodValidationPipe } from "../../core/validation/zod-validation.pipe";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -59,5 +59,30 @@ export class OrchestratorController {
   @Roles(...MEMBER_ROLES)
   async cancel(@Param("projectId") projectId: string, @Param("runId") runId: string): Promise<ToolRunDto> {
     return this.orchestratorService.cancelRun(projectId, runId);
+  }
+
+  /**
+   * Audit-only access to a run's raw stdout. `@Res()` (no `passthrough`) hands full control of
+   * the response to us so the global `TransformResponseInterceptor` never wraps binary output in
+   * the `{ success, data }` JSON envelope, and the file is always served as an attachment --
+   * never inline-rendered (SEC-052) -- so it can't be mistaken for a trusted graph object.
+   */
+  @Get(":runId/raw")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("owner", "admin")
+  async raw(
+    @Param("projectId") projectId: string,
+    @Param("runId") runId: string,
+    @Res() response: Response,
+  ): Promise<void> {
+    const { buffer, format, byteSize } = await this.orchestratorService.getRawOutput(projectId, runId);
+    response
+      .status(200)
+      .set({
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${runId}-${format}.txt"`,
+        "Content-Length": String(byteSize),
+      })
+      .send(buffer);
   }
 }
