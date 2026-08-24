@@ -1,6 +1,7 @@
 import { forwardRef, Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
 import { ProjectsModule } from "../projects/projects.module";
+import { StorageModule } from "../../core/storage/storage.module";
 import { DATABASE_CONNECTION } from "../../core/database/database.tokens";
 import type { Database } from "../../core/database/client";
 import { DrizzleNodesRepository } from "./repositories/nodes.repository";
@@ -40,7 +41,7 @@ const REPOSITORY_TOKENS = [
 ];
 
 @Module({
-  imports: [forwardRef(() => AuthModule), forwardRef(() => ProjectsModule)],
+  imports: [forwardRef(() => AuthModule), forwardRef(() => ProjectsModule), StorageModule],
   controllers: [KnowledgeController],
   providers: [
     KnowledgeService,
