@@ -1,33 +1,7 @@
 import { useAuthStore } from "@/features/auth/auth.store";
+import { ApiError, type ApiEnvelope, type ApiSuccessEnvelope } from "./api-envelope";
 
-/** Mirrors server/src/core/http/response-envelope.ts -- the wire shape of every API response. */
-interface ApiSuccessEnvelope<T> {
-  success: true;
-  data: T;
-  meta?: { total: number; page: number; pageSize: number };
-}
-
-interface ApiErrorEnvelope {
-  success: false;
-  error: { message: string; code: string; correlationId: string };
-}
-
-type ApiEnvelope<T> = ApiSuccessEnvelope<T> | ApiErrorEnvelope;
-
-/** A safe-to-display API failure -- never carries a raw Response or backend stack trace (FE-018). */
-export class ApiError extends Error {
-  readonly code: string;
-  readonly correlationId: string;
-  readonly status: number;
-
-  constructor(status: number, envelope: ApiErrorEnvelope) {
-    super(envelope.error.message);
-    this.name = "ApiError";
-    this.code = envelope.error.code;
-    this.correlationId = envelope.error.correlationId;
-    this.status = status;
-  }
-}
+export { ApiError };
 
 const API_BASE_URL = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/v1`;
 
@@ -66,10 +40,10 @@ async function rawRequest<T>(path: string, options: RequestOptions): Promise<{ s
 async function refreshAccessToken(): Promise<string | null> {
   try {
     const response = await fetch("/api/auth/refresh", { method: "POST", credentials: "include" });
-    if (!response.ok) return null;
-    const body = (await response.json()) as { accessToken: string };
-    useAuthStore.getState().setAccessToken(body.accessToken);
-    return body.accessToken;
+    const envelope = (await response.json()) as ApiEnvelope<{ accessToken: string }>;
+    if (!envelope.success) return null;
+    useAuthStore.getState().setAccessToken(envelope.data.accessToken);
+    return envelope.data.accessToken;
   } catch {
     return null;
   }

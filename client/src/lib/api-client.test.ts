@@ -58,7 +58,7 @@ describe("apiRequest", () => {
     useAuthStore.getState().setSession({ accessToken: "stale-token", user: { id: "u1", email: "a@b.com", displayName: null } });
     vi.mocked(fetch)
       .mockResolvedValueOnce(jsonResponse(401, { success: false, error: { message: "Unauthorized", code: "UNAUTHORIZED", correlationId: "c" } }))
-      .mockResolvedValueOnce(jsonResponse(200, { accessToken: "fresh-token" }))
+      .mockResolvedValueOnce(jsonResponse(200, { success: true, data: { accessToken: "fresh-token" } }))
       .mockResolvedValueOnce(jsonResponse(200, { success: true, data: { ok: true } }));
 
     const result = await apiRequest<{ ok: boolean }>("/projects");
