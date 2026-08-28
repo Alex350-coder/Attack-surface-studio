@@ -16,6 +16,10 @@ out/
 # Test coverage reports
 coverage/
 
+# Playwright artifacts
+playwright-report/
+test-results/
+
 # Local blob storage (STORAGE_ROOT) -- raw tool output / evidence file bytes, never committed
 server/data/
 
