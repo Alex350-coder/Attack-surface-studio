@@ -11,6 +11,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  // server-contracts.ts re-exports the backend's raw TypeScript Zod schemas
+  // (@attack-surface-studio/server/src/contracts) so both sides share one contract (DRY). That
+  // package ships untranspiled `.ts` source via a `file:` link, and webpack does not transpile
+  // node_modules by default -- without this, any client component that reaches the runtime
+  // schemas (e.g. to validate a graph response, FE-004) fails to build with a raw TS parse error.
+  transpilePackages: ["@attack-surface-studio/server"],
 };
 
 export default nextConfig;
