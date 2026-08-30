@@ -1,4 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
+import { NotFoundError } from "../../core/http/domain-error";
 import { BLOB_STORAGE } from "../../core/storage/storage.tokens";
 import type { BlobStorage } from "../../core/storage/blob-storage.contract";
 import { EDGES_REPOSITORY, EVIDENCE_FILES_REPOSITORY, GRAPH_BUILDER, NOTES_REPOSITORY } from "./knowledge.tokens";
@@ -99,6 +100,23 @@ export class KnowledgeService {
     pagination?: PaginationParams,
   ): Promise<Paginated<EvidenceFileRow>> {
     return this.evidenceFilesRepository.listByProject(projectId, nodeId, pagination);
+  }
+
+  /**
+   * Serves evidence bytes back out. Mirrors the orchestrator's raw-output access pattern: the
+   * service only resolves identity and fetches the blob -- the controller decides how to send it
+   * (attachment vs inline) so the safe-serving decision stays in one place (SEC-052).
+   */
+  async getEvidenceContent(
+    projectId: string,
+    evidenceId: string,
+  ): Promise<{ buffer: Buffer; mimeType: string; row: EvidenceFileRow }> {
+    const row = await this.evidenceFilesRepository.findById(projectId, evidenceId);
+    if (!row) {
+      throw new NotFoundError(`Evidence file ${evidenceId} was not found in this project`);
+    }
+    const buffer = await this.blobStorage.get(row.fileRef);
+    return { buffer, mimeType: row.mimeType, row };
   }
 
   /** A note is conceptually "a GraphDelta of size one" -- same persistence path as a manual node. */

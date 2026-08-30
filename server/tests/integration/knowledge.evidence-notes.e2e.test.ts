@@ -187,6 +187,43 @@ describe("Evidence upload and notes (POST /api/v1/projects/:id/evidence, /notes)
     expect(res.status).toBe(403);
   });
 
+  it("serves the uploaded evidence bytes back through the content endpoint", async () => {
+    const owner = await registerUser("evidence-content-owner");
+    const project = await createProject(owner.accessToken, "Evidence Content Project");
+
+    const uploadRes = await request(server())
+      .post(`/api/v1/projects/${project.id}/evidence`)
+      .set("Authorization", `Bearer ${owner.accessToken}`)
+      .attach("file", PNG_SIGNATURE, { filename: "evidence.png", contentType: "image/png" });
+    const evidence = dataOf<EvidenceFileBody>(uploadRes);
+
+    const contentRes = await request(server())
+      .get(`/api/v1/projects/${project.id}/evidence/${evidence.id}/content`)
+      .set("Authorization", `Bearer ${owner.accessToken}`)
+      .buffer(true)
+      .parse((res, callback) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => callback(null, Buffer.concat(chunks)));
+      });
+
+    expect(contentRes.status).toBe(200);
+    expect(contentRes.headers["content-type"]).toBe("image/png");
+    expect(contentRes.headers["content-disposition"]).toContain("inline");
+    expect(Buffer.isBuffer(contentRes.body) ? (contentRes.body as Buffer).equals(PNG_SIGNATURE) : false).toBe(true);
+  });
+
+  it("returns 404 for an evidence content id that does not exist in the project", async () => {
+    const owner = await registerUser("evidence-content-404-owner");
+    const project = await createProject(owner.accessToken, "Evidence Content 404 Project");
+
+    const res = await request(server())
+      .get(`/api/v1/projects/${project.id}/evidence/00000000-0000-0000-0000-000000000000/content`)
+      .set("Authorization", `Bearer ${owner.accessToken}`);
+
+    expect(res.status).toBe(404);
+  });
+
   it("lets a member add a note and enriches the graph with a note node", async () => {
     const owner = await registerUser("notes-owner");
     const project = await createProject(owner.accessToken, "Notes Project");
