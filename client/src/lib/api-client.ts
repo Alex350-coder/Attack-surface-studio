@@ -6,7 +6,7 @@ export { ApiError };
 const API_BASE_URL = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/v1`;
 
 interface RequestOptions {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   /** Skips the Authorization header and the 401-refresh retry (used by auth endpoints themselves). */
   skipAuth?: boolean;
