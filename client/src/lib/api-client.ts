@@ -13,7 +13,12 @@ interface RequestOptions {
 }
 
 async function rawRequest<T>(path: string, options: RequestOptions): Promise<{ status: number; envelope: ApiEnvelope<T> }> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const isMultipart = options.body instanceof FormData;
+  const headers: Record<string, string> = {};
+  // The browser sets the multipart boundary itself -- an explicit Content-Type here breaks it.
+  if (!isMultipart) {
+    headers["Content-Type"] = "application/json";
+  }
   if (!options.skipAuth) {
     const accessToken = useAuthStore.getState().accessToken;
     if (accessToken) {
@@ -24,7 +29,7 @@ async function rawRequest<T>(path: string, options: RequestOptions): Promise<{ s
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: options.method ?? "GET",
     headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body: isMultipart ? (options.body as FormData) : options.body !== undefined ? JSON.stringify(options.body) : undefined,
     credentials: "include",
   });
 
@@ -75,6 +80,12 @@ async function requestEnvelope<T>(path: string, options: RequestOptions): Promis
 /** Generic authenticated API call, returning just the unwrapped `data` payload. */
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const envelope = await requestEnvelope<T>(path, options);
+  return envelope.data;
+}
+
+/** Multipart upload (evidence files). Reuses the same 401-refresh-retry as `apiRequest`. */
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const envelope = await requestEnvelope<T>(path, { method: "POST", body: formData });
   return envelope.data;
 }
 
