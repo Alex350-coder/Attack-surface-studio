@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthStore } from "@/features/auth/auth.store";
-import { ApiError, apiRequest, apiRequestPaginated, apiUpload } from "./api-client";
+import { ApiError, apiRequest, apiRequestBlob, apiRequestPaginated, apiUpload } from "./api-client";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -121,5 +121,34 @@ describe("apiUpload", () => {
     const [, init] = vi.mocked(fetch).mock.calls[0];
     expect(init?.body).toBe(formData);
     expect((init?.headers as Record<string, string>)["Content-Type"]).toBeUndefined();
+  });
+});
+
+describe("apiRequestBlob", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    useAuthStore.getState().clear();
+  });
+
+  it("returns the response body as a Blob with the Authorization header attached", async () => {
+    useAuthStore.getState().setSession({ accessToken: "token-1", user: { id: "u1", email: "a@b.com", displayName: null } });
+    vi.mocked(fetch).mockResolvedValueOnce(new Response("raw bytes", { status: 200 }));
+
+    const result = await apiRequestBlob("/projects/p1/runs/r1/raw");
+
+    expect(result).toBeInstanceOf(Blob);
+    expect(await result.text()).toBe("raw bytes");
+    const [, init] = vi.mocked(fetch).mock.calls[0];
+    expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer token-1");
+  });
+
+  it("throws an ApiError on a non-OK response, never a raw Response", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 403 }));
+
+    await expect(apiRequestBlob("/projects/p1/runs/r1/raw")).rejects.toBeInstanceOf(ApiError);
   });
 });

@@ -89,6 +89,28 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
   return envelope.data;
 }
 
+/**
+ * Fetches a binary/non-JSON response (raw run output, evidence file bytes) with the same
+ * Authorization header as `apiRequest`, bypassing the JSON envelope entirely -- these endpoints
+ * stream bytes directly (SEC-052), not `{success, data}`. No 401-refresh retry: these links are
+ * short-lived UI actions (open in a new tab / render an `<img>`), not core app flows.
+ */
+export async function apiRequestBlob(path: string): Promise<Blob> {
+  const accessToken = useAuthStore.getState().accessToken;
+  const headers: Record<string, string> = {};
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+  const response = await fetch(`${API_BASE_URL}${path}`, { headers, credentials: "include" });
+  if (!response.ok) {
+    throw new ApiError(response.status, {
+      success: false,
+      error: { code: "REQUEST_FAILED", message: "Request failed", correlationId: "" },
+    });
+  }
+  return response.blob();
+}
+
 /** Same as `apiRequest`, but also returns pagination `meta` for list endpoints. */
 export async function apiRequestPaginated<T>(
   path: string,
