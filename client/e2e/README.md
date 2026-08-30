@@ -4,6 +4,11 @@
 project list → create a project → open it → the graph container renders → logout → an
 unauthenticated visit to `/app` redirects to `/login`.
 
+`project-workflow.spec.ts` extends that setup to cover the Phase 10 surfaces in one session:
+launch the harmless `stub` adapter → poll its run to `succeeded` → the graph enriches with its
+asset/finding nodes → upload evidence → it's listed → assemble a report from a selected node →
+the preview renders it.
+
 ## Stack required
 
 This suite talks to the real backend, not a mock. Before running it:
