@@ -52,7 +52,12 @@ function ToolConfigRow({
   const configQuery = useToolConfig(projectId, toolId);
   const setConfig = useSetToolConfig(projectId, toolId);
   const detectTool = useDetectTool(projectId, toolId);
-  const [mode, setMode] = useState<"local" | "docker">(configQuery.data?.executionMode ?? "local");
+  // Local override once the user touches the select; until then, always reflect the saved
+  // config. A plain `useState(configQuery.data?.executionMode ?? "local")` initializer would
+  // only run once on mount and go stale once the query resolves after the first render,
+  // silently reverting a saved "docker" config back to "local" on the next Save.
+  const [modeOverride, setModeOverride] = useState<"local" | "docker" | null>(null);
+  const mode = modeOverride ?? configQuery.data?.executionMode ?? "local";
 
   return (
     <li className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3">
@@ -69,7 +74,7 @@ function ToolConfigRow({
           id={`tool-${toolId}-mode`}
           label="Execution mode"
           value={mode}
-          onChange={(value) => setMode(value as "local" | "docker")}
+          onChange={(value) => setModeOverride(value as "local" | "docker")}
           options={[
             { value: "local", label: "Local" },
             { value: "docker", label: "Docker" },

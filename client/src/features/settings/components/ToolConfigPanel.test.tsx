@@ -106,6 +106,27 @@ describe("ToolConfigPanel", () => {
     expect(setConfigMutate).toHaveBeenCalledWith({ executionMode: "local", config: {} });
   });
 
+  it("reflects a saved execution mode once the config query resolves, instead of staying on the initial default", () => {
+    vi.mocked(useTools).mockReturnValue(
+      toolsQueryResult({ data: [{ id: "nmap", displayName: "Nmap", supportedModes: ["local", "docker"] }] }),
+    );
+    vi.mocked(useDetectTool).mockReturnValue(detectMutationResult({}));
+    vi.mocked(useSetToolConfig).mockReturnValue(setConfigMutationResult({}));
+
+    // First render: the config query hasn't resolved yet (undefined data).
+    vi.mocked(useToolConfig).mockReturnValue(configQueryResult({ isLoading: true, data: undefined }));
+    const { rerender } = render(<ToolConfigPanel projectId={PROJECT_ID} />);
+    expect(screen.getByLabelText("Execution mode")).toHaveValue("local");
+
+    // Second render: the query resolves with a previously-saved "docker" config -- the select
+    // must pick that up rather than staying frozen on the "local" default from mount.
+    vi.mocked(useToolConfig).mockReturnValue(
+      configQueryResult({ data: { executionMode: "docker", config: {} } as ToolConfig }),
+    );
+    rerender(<ToolConfigPanel projectId={PROJECT_ID} />);
+    expect(screen.getByLabelText("Execution mode")).toHaveValue("docker");
+  });
+
   it("shows the detection result as a badge", () => {
     vi.mocked(useTools).mockReturnValue(
       toolsQueryResult({ data: [{ id: "nmap", displayName: "Nmap", supportedModes: ["local"] }] }),

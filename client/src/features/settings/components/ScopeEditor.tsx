@@ -16,6 +16,17 @@ type Props = {
 // scopeEntrySchema -- the server independently re-validates every entry (FE-006).
 const scopeEntrySchema = z.string().trim().min(1, "Enter a hostname, wildcard domain, IP, or CIDR range.");
 
+// `Project.scope` is typed `z.unknown()` (use-projects.ts) because the client never trusts a
+// stored value's shape sight-unseen -- parse it defensively here instead of casting, since a
+// malformed/older/future scope shape must not crash this panel (no `as` cast, per the project's
+// "no unsafe casts" standard).
+const scopeShapeSchema = z
+  .object({
+    includes: z.array(z.string()).default([]),
+    excludes: z.array(z.string()).default([]),
+  })
+  .catch({ includes: [], excludes: [] });
+
 type ScopeList = "includes" | "excludes";
 
 /**
@@ -31,9 +42,9 @@ export function ScopeEditor({ projectId }: Props) {
   const [excludes, setExcludes] = useState<string[]>([]);
 
   useEffect(() => {
-    const scope = projectQuery.data?.scope as { includes?: string[]; excludes?: string[] } | undefined;
-    setIncludes(scope?.includes ?? []);
-    setExcludes(scope?.excludes ?? []);
+    const scope = scopeShapeSchema.parse(projectQuery.data?.scope);
+    setIncludes(scope.includes);
+    setExcludes(scope.excludes);
   }, [projectQuery.data]);
 
   if (projectQuery.isLoading) {
