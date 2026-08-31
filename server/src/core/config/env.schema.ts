@@ -36,6 +36,14 @@ export const envSchema = z.object({
   // without weakening it for the deployed API.
   THROTTLE_TTL_MS: z.coerce.number().int().positive().default(60_000),
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(100),
+  // AI Assistant (Phase 11) -- deliberately optional, unlike every other secret above. The
+  // assistant is a genuinely optional feature: when unset, AssistantModule wires a
+  // NullLlmProvider that returns a graceful 503 instead of a silent fake answer, so every
+  // existing suite that boots AppModule keeps booting without these. See SECURITY_MODEL.md
+  // "AI Assistant security" for why this is a documented deviation from fail-fast-required.
+  NVIDIA_API_KEY: z.string().min(1).optional(),
+  NVIDIA_MODEL_ID: z.string().min(1).optional(),
+  NVIDIA_API_BASE_URL: z.string().url().default("https://integrate.api.nvidia.com/v1"),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
