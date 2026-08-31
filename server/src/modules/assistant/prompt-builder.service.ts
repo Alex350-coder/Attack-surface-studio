@@ -117,8 +117,13 @@ export class PromptBuilderService {
     return { messages, includedNodeIds, includedEdgeIds, truncated };
   }
 
-  /** Drops any id the model response mentions that wasn't actually present in the context sent
-   * to it -- defends against a successful injection inventing or leaking a foreign-project id. */
+  /**
+   * Not called today: `AssistantService` derives `referencedNodeIds` from `includedNodeIds` (the
+   * context actually sent to the model), never by parsing the model's free-text answer, so there
+   * is currently no path for the model to invent or leak a foreign id. Kept as a ready-made guard
+   * for the day a feature starts extracting ids from model output -- wire it in there rather than
+   * assuming this already runs (code/security review follow-up, Phase 11).
+   */
   filterKnownIds(candidateIds: string[], allowedIds: Set<string>): string[] {
     return candidateIds.filter((id) => allowedIds.has(id));
   }

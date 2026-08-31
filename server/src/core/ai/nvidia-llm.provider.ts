@@ -12,6 +12,9 @@ export interface NvidiaLlmProviderConfig {
   baseUrl: string;
 }
 
+/** Bounds how long a single completion call may hold an HTTP request open (code review LOW-3). */
+const REQUEST_TIMEOUT_MS = 20_000;
+
 /**
  * NVIDIA NIM exposes an OpenAI-compatible chat-completions endpoint, so the `openai` SDK is used
  * as a generic HTTP client pointed at NVIDIA's `baseURL` -- no NVIDIA-specific SDK needed
@@ -21,7 +24,11 @@ export class NvidiaLlmProvider implements LlmProvider {
   private readonly client: OpenAI;
 
   constructor(private readonly config: NvidiaLlmProviderConfig) {
-    this.client = new OpenAI({ apiKey: config.apiKey, baseURL: config.baseUrl });
+    this.client = new OpenAI({
+      apiKey: config.apiKey,
+      baseURL: config.baseUrl,
+      timeout: REQUEST_TIMEOUT_MS,
+    });
   }
 
   isConfigured(): boolean {
