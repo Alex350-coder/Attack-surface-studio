@@ -14,13 +14,14 @@ const SECTIONS = [
   { segment: "evidence", label: "Evidence" },
   { segment: "reports", label: "Reports" },
   { segment: "timeline", label: "Timeline" },
+  { segment: "assistant", label: "Assistant" },
   { segment: "settings", label: "Settings" },
 ] as const;
 
 /**
  * Routes, not a single page's panels, so this can't be `<Tabs>` itself (that primitive controls
  * visibility of children sharing one page's state). It reuses the same `role="tablist"` visual
- * language -- underline-on-active, muted-to-foreground hover -- so the six project surfaces read
+ * language -- underline-on-active, muted-to-foreground hover -- so the seven project surfaces read
  * as one consistent navigation model regardless of which is backed by client state vs a route.
  */
 export function ProjectSubNav({ projectId }: Props) {

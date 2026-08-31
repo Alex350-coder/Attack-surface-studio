@@ -13,7 +13,7 @@ describe("ProjectSubNav", () => {
     vi.clearAllMocks();
   });
 
-  it("links to all six project sections", () => {
+  it("links to all seven project sections", () => {
     vi.mocked(usePathname).mockReturnValue(`/app/projects/${PROJECT_ID}`);
     render(<ProjectSubNav projectId={PROJECT_ID} />);
 
@@ -30,6 +30,10 @@ describe("ProjectSubNav", () => {
     expect(screen.getByRole("tab", { name: "Timeline" })).toHaveAttribute(
       "href",
       `/app/projects/${PROJECT_ID}/timeline`,
+    );
+    expect(screen.getByRole("tab", { name: "Assistant" })).toHaveAttribute(
+      "href",
+      `/app/projects/${PROJECT_ID}/assistant`,
     );
     expect(screen.getByRole("tab", { name: "Settings" })).toHaveAttribute(
       "href",
