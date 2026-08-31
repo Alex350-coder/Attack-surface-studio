@@ -34,7 +34,7 @@ describe("NvidiaLlmProvider", () => {
     const result = await provider.complete({ messages: [{ role: "user", content: "hi" }] });
 
     expect(result.content).toBe("hello");
-    const callArgs = createMock.mock.calls[0]![0];
+    const callArgs = createMock.mock.calls[0]![0] as Record<string, unknown>;
     expect(callArgs.tools).toBeUndefined();
     expect(callArgs.function_call).toBeUndefined();
     expect(callArgs.model).toBe("m");

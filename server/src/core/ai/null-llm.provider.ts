@@ -17,6 +17,7 @@ export class NullLlmProvider implements LlmProvider {
     return false;
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- interface requires a Promise-returning signature
   async complete(_request: LlmCompletionRequest): Promise<LlmCompletionResult> {
     throw new LlmProviderUnavailableError("No LLM provider is configured");
   }

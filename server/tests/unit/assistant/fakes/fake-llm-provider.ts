@@ -11,6 +11,7 @@ export class FakeLlmProvider implements LlmProvider {
     return this.configured;
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- interface requires a Promise-returning signature
   async complete(request: LlmCompletionRequest): Promise<LlmCompletionResult> {
     this.lastRequest = request;
     if (this.error) {
