@@ -6,14 +6,19 @@ export { ApiError };
 const API_BASE_URL = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/v1`;
 
 interface RequestOptions {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   /** Skips the Authorization header and the 401-refresh retry (used by auth endpoints themselves). */
   skipAuth?: boolean;
 }
 
 async function rawRequest<T>(path: string, options: RequestOptions): Promise<{ status: number; envelope: ApiEnvelope<T> }> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const isMultipart = options.body instanceof FormData;
+  const headers: Record<string, string> = {};
+  // The browser sets the multipart boundary itself -- an explicit Content-Type here breaks it.
+  if (!isMultipart) {
+    headers["Content-Type"] = "application/json";
+  }
   if (!options.skipAuth) {
     const accessToken = useAuthStore.getState().accessToken;
     if (accessToken) {
@@ -24,7 +29,7 @@ async function rawRequest<T>(path: string, options: RequestOptions): Promise<{ s
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: options.method ?? "GET",
     headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body: isMultipart ? (options.body as FormData) : options.body !== undefined ? JSON.stringify(options.body) : undefined,
     credentials: "include",
   });
 
@@ -76,6 +81,34 @@ async function requestEnvelope<T>(path: string, options: RequestOptions): Promis
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const envelope = await requestEnvelope<T>(path, options);
   return envelope.data;
+}
+
+/** Multipart upload (evidence files). Reuses the same 401-refresh-retry as `apiRequest`. */
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const envelope = await requestEnvelope<T>(path, { method: "POST", body: formData });
+  return envelope.data;
+}
+
+/**
+ * Fetches a binary/non-JSON response (raw run output, evidence file bytes) with the same
+ * Authorization header as `apiRequest`, bypassing the JSON envelope entirely -- these endpoints
+ * stream bytes directly (SEC-052), not `{success, data}`. No 401-refresh retry: these links are
+ * short-lived UI actions (open in a new tab / render an `<img>`), not core app flows.
+ */
+export async function apiRequestBlob(path: string): Promise<Blob> {
+  const accessToken = useAuthStore.getState().accessToken;
+  const headers: Record<string, string> = {};
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+  const response = await fetch(`${API_BASE_URL}${path}`, { headers, credentials: "include" });
+  if (!response.ok) {
+    throw new ApiError(response.status, {
+      success: false,
+      error: { code: "REQUEST_FAILED", message: "Request failed", correlationId: "" },
+    });
+  }
+  return response.blob();
 }
 
 /** Same as `apiRequest`, but also returns pagination `meta` for list endpoints. */

@@ -73,4 +73,53 @@ describe("GraphTraversalRepository", () => {
     const result = await repo.getReachableNodeIds(otherProjectId, domainId, 3);
     expect(result).toEqual([]);
   });
+
+  describe("getAssistantContextNodes", () => {
+    it("without a focus node, returns the project's nodes", async () => {
+      const result = await repo.getAssistantContextNodes(projectId);
+      expect(result.map((n) => n.id).sort()).toEqual([domainId, subdomainId, ipId, portId].sort());
+    });
+
+    it("with a focus node, expands outward in either edge direction up to maxDepth", async () => {
+      const result = await repo.getAssistantContextNodes(projectId, subdomainId, 1);
+      expect(result.map((n) => n.id).sort()).toEqual([domainId, subdomainId, ipId].sort());
+    });
+
+    it("never returns another project's nodes", async () => {
+      const otherProjectId = (await projects.create({ name: "P2", slug: "p2" })).id;
+      const result = await repo.getAssistantContextNodes(otherProjectId);
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("getCriticalFindingsForAsset", () => {
+    it("returns only criticalFinding nodes connected to the given asset", async () => {
+      const [finding, unrelatedNote] = await nodesRepo.upsertMany(projectId, [
+        { identityKey: "finding:1", type: "criticalFinding", category: "security", label: "RCE" },
+        { identityKey: "note:1", type: "note", category: "intelligence", label: "unrelated" },
+      ]);
+      await edgesRepo.upsertMany(projectId, [{ sourceId: finding!.id, targetId: ipId, type: "risk" }]);
+
+      const result = await repo.getCriticalFindingsForAsset(projectId, ipId);
+
+      expect(result.map((n) => n.id)).toEqual([finding!.id]);
+      expect(result.map((n) => n.id)).not.toContain(unrelatedNote!.id);
+    });
+  });
+
+  describe("getUnscannedTargets", () => {
+    it("returns infrastructure nodes with no outgoing discovery edge", async () => {
+      const result = await repo.getUnscannedTargets(projectId);
+      // port has no outgoing discovery edge but is not one of the target types; ip/subdomain/
+      // domain each have an outgoing discovery edge in the beforeEach fixture, so none qualify.
+      expect(result).toEqual([]);
+
+      const [freshDomain] = await nodesRepo.upsertMany(projectId, [
+        { identityKey: "domain:untouched.com", type: "domain", category: "infrastructure", label: "untouched.com" },
+      ]);
+
+      const afterAdd = await repo.getUnscannedTargets(projectId);
+      expect(afterAdd.map((n) => n.id)).toEqual([freshDomain!.id]);
+    });
+  });
 });

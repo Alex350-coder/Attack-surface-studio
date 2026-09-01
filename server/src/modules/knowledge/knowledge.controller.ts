@@ -1,7 +1,19 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { fromBuffer } from "file-type";
-import type { Request } from "express";
+import type { Request, Response } from "express";
 import { UnauthorizedError, ValidationError } from "../../core/http/domain-error";
 import { ZodValidationPipe } from "../../core/validation/zod-validation.pipe";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -98,6 +110,32 @@ export class KnowledgeController {
     @Query(new ZodValidationPipe(paginationQuerySchema)) query: PaginationQueryDto,
   ): Promise<Paginated<EvidenceFileRow>> {
     return this.knowledgeService.listEvidence(projectId, nodeId, query);
+  }
+
+  /**
+   * Streams evidence bytes back. `@Res()` bypasses the JSON envelope interceptor the same way
+   * `orchestrator.controller.ts`'s `raw` endpoint does. Images are already magic-byte-validated
+   * at upload time, so they're trusted enough to render inline (`<img src>`); everything else is
+   * forced to download so it can never be mistaken for trusted, renderable content (SEC-052).
+   */
+  @Get("evidence/:evidenceId/content")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...PROJECT_ROLES)
+  async evidenceContent(
+    @Param("projectId") projectId: string,
+    @Param("evidenceId") evidenceId: string,
+    @Res() response: Response,
+  ): Promise<void> {
+    const { buffer, mimeType } = await this.knowledgeService.getEvidenceContent(projectId, evidenceId);
+    const disposition = mimeType.startsWith("image/") ? "inline" : "attachment";
+    response
+      .status(200)
+      .set({
+        "Content-Type": mimeType,
+        "Content-Disposition": `${disposition}; filename="${evidenceId}"`,
+        "Content-Length": String(buffer.byteLength),
+      })
+      .send(buffer);
   }
 
   @Post("notes")

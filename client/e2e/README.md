@@ -4,6 +4,17 @@
 project list → create a project → open it → the graph container renders → logout → an
 unauthenticated visit to `/app` redirects to `/login`.
 
+`project-workflow.spec.ts` extends that setup to cover the Phase 10 surfaces in one session:
+launch the harmless `stub` adapter → poll its run to `succeeded` → the graph enriches with its
+asset/finding nodes → upload evidence → it's listed → assemble a report from a selected node →
+the preview renders it.
+
+`assistant.spec.ts` covers the Phase 11 AI Assistant: create a project → open its Assistant tab →
+ask a question. It deliberately accepts two terminal states instead of one, since
+`NVIDIA_API_KEY` is a user-provided testing secret that may or may not be set in `server/.env`
+locally — a real answer, or the graceful `AssistantProviderUnavailableError` (HTTP 503) message,
+are both correct outcomes.
+
 ## Stack required
 
 This suite talks to the real backend, not a mock. Before running it:
