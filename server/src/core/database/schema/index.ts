@@ -10,6 +10,7 @@ import { rawOutputs } from "./rawOutputs";
 import { evidenceFiles } from "./evidenceFiles";
 import { notes } from "./notes";
 import { reports } from "./reports";
+import { reportExports } from "./reportExports";
 import { sessions } from "./sessions";
 
 export {
@@ -24,6 +25,7 @@ export {
   evidenceFiles,
   notes,
   reports,
+  reportExports,
   sessions,
 };
 
@@ -90,6 +92,12 @@ export const notesRelations = relations(notes, ({ one }) => ({
   node: one(nodes, { fields: [notes.nodeId], references: [nodes.id] }),
 }));
 
-export const reportsRelations = relations(reports, ({ one }) => ({
+export const reportsRelations = relations(reports, ({ one, many }) => ({
   project: one(projects, { fields: [reports.projectId], references: [projects.id] }),
+  exports: many(reportExports),
+}));
+
+export const reportExportsRelations = relations(reportExports, ({ one }) => ({
+  report: one(reports, { fields: [reportExports.reportId], references: [reports.id] }),
+  generatedByUser: one(users, { fields: [reportExports.generatedBy], references: [users.id] }),
 }));
