@@ -4,6 +4,7 @@ import { GraphEngine } from "@/modules/graph-engine";
 import { Badge, reportStatusTone } from "@/components/ui/badge";
 import { toGraphModel } from "@/features/workspace/graph/to-graph-model";
 import { useReport } from "../api/use-report";
+import { ReportExportMenu } from "./ReportExportMenu";
 
 type Props = {
   projectId: string;
@@ -11,7 +12,7 @@ type Props = {
 };
 
 /** Renders a report's stored `graphSnapshot` read-only -- the same node/edge adapter the live
- * workspace view uses, reused rather than duplicated (FE-012). No export button yet (Phase 12). */
+ * workspace view uses, reused rather than duplicated (FE-012). */
 export function ReportPreview({ projectId, reportId }: Props) {
   const reportQuery = useReport(projectId, reportId);
 
@@ -33,6 +34,9 @@ export function ReportPreview({ projectId, reportId }: Props) {
       <div className="flex items-center gap-3">
         <h1 className="text-xl font-semibold">{report.title}</h1>
         <Badge tone={reportStatusTone(report.status)}>{report.status}</Badge>
+        <div className="ml-auto">
+          <ReportExportMenu projectId={projectId} reportId={reportId} />
+        </div>
       </div>
       <div className="h-[32rem] rounded-[var(--radius-md)] border border-[var(--color-border)]">
         <GraphEngine data={graphModel} />

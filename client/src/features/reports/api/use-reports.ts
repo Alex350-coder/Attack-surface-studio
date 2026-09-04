@@ -10,7 +10,7 @@ export const reportSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
   title: z.string(),
-  status: z.string(),
+  status: z.enum(["draft", "generating", "ready", "failed"]),
   graphSnapshot: z.object({
     nodes: z.array(nodeSchema),
     edges: z.array(edgeSchema),

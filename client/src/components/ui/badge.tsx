@@ -34,7 +34,9 @@ const RUN_STATUS_TONES: Record<string, VariantProps<typeof badgeVariants>["tone"
 
 const REPORT_STATUS_TONES: Record<string, VariantProps<typeof badgeVariants>["tone"]> = {
   draft: "pending",
+  generating: "active",
   ready: "success",
+  failed: "danger",
 };
 
 export function runStatusTone(status: string): VariantProps<typeof badgeVariants>["tone"] {
