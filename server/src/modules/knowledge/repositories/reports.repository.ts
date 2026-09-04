@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Database } from "../../../core/database/client";
 import { reports } from "../../../core/database/schema";
 import {
@@ -34,10 +34,26 @@ export interface ReportStatusUpdate {
   contentRef?: string | null;
 }
 
+export interface ReportStatusTransition {
+  from: readonly string[];
+  to: string;
+}
+
 /** All data access for the `reports` table. Every method is project-scoped (DB-013, SEC-012). */
 export interface ReportsRepository {
   create(projectId: string, input: ReportCreateInput): Promise<ReportRow>;
   updateStatus(projectId: string, id: string, update: ReportStatusUpdate): Promise<ReportRow | null>;
+  /**
+   * Atomically moves a report from one of `from` to `to` in a single conditional UPDATE
+   * (OWA-020: report finalization is concurrency-sensitive). Returns null -- never throws -- when
+   * no row matched (already transitioned by a concurrent request, wrong project, or missing),
+   * so the caller can map that to a 409 conflict instead of silently overwriting.
+   */
+  transitionStatus(
+    projectId: string,
+    id: string,
+    transition: ReportStatusTransition,
+  ): Promise<ReportRow | null>;
   findById(projectId: string, id: string): Promise<ReportRow | null>;
   listByProject(projectId: string, pagination?: PaginationParams): Promise<Paginated<ReportRow>>;
   softDelete(projectId: string, id: string): Promise<void>;
@@ -70,6 +86,25 @@ export class DrizzleReportsRepository implements ReportsRepository {
       .update(reports)
       .set({ status: update.status, contentRef: update.contentRef, updatedAt: sql`now()` })
       .where(and(eq(reports.projectId, projectId), eq(reports.id, id)))
+      .returning();
+    return (row as ReportRow) ?? null;
+  }
+
+  async transitionStatus(
+    projectId: string,
+    id: string,
+    transition: ReportStatusTransition,
+  ): Promise<ReportRow | null> {
+    const [row] = await this.db
+      .update(reports)
+      .set({ status: transition.to, updatedAt: sql`now()` })
+      .where(
+        and(
+          eq(reports.projectId, projectId),
+          eq(reports.id, id),
+          inArray(reports.status, transition.from as string[]),
+        ),
+      )
       .returning();
     return (row as ReportRow) ?? null;
   }
