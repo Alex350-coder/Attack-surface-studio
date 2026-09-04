@@ -199,4 +199,94 @@ describe("Reports assembly (POST/GET /api/v1/projects/:id/reports)", () => {
 
     expect(res.status).toBe(403);
   });
+
+  describe("export (GET /api/v1/projects/:id/reports/:reportId/export)", () => {
+    async function assembleReport(accessToken: string, projectId: string, nodeId: string): Promise<ReportBody> {
+      const res = await request(server())
+        .post(`/api/v1/projects/${projectId}/reports`)
+        .set("Authorization", `Bearer ${accessToken}`)
+        .send({ title: "Exportable Report", nodeIds: [nodeId], edgeIds: [] });
+      expect(res.status).toBe(201);
+      return dataOf<ReportBody>(res);
+    }
+
+    it.each(["pdf", "html", "markdown"] as const)("exports the report as %s", async (format) => {
+      const owner = await registerUser(`reports-export-${format}`);
+      const project = await createProject(owner.accessToken, `Export ${format}`);
+      const node = await createNode(owner.accessToken, project.id, "Exportable finding");
+      const report = await assembleReport(owner.accessToken, project.id, node.id);
+
+      const res = await request(server())
+        .get(`/api/v1/projects/${project.id}/reports/${report.id}/export`)
+        .query({ format })
+        .buffer(true)
+        .parse((response, callback) => {
+          const chunks: Buffer[] = [];
+          response.on("data", (chunk: Buffer) => chunks.push(chunk));
+          response.on("end", () => callback(null, Buffer.concat(chunks)));
+        })
+        .set("Authorization", `Bearer ${owner.accessToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers["content-disposition"]).toContain("attachment");
+      expect((res.body as Buffer).length).toBeGreaterThan(0);
+    });
+
+    it("returns a byte-identical cached artifact on a repeated export", async () => {
+      const owner = await registerUser("reports-export-cache");
+      const project = await createProject(owner.accessToken, "Export Cache");
+      const node = await createNode(owner.accessToken, project.id, "Cached finding");
+      const report = await assembleReport(owner.accessToken, project.id, node.id);
+
+      function bufferedExport() {
+        return request(server())
+          .get(`/api/v1/projects/${project.id}/reports/${report.id}/export`)
+          .query({ format: "markdown" })
+          .buffer(true)
+          .parse((response, callback) => {
+            const chunks: Buffer[] = [];
+            response.on("data", (chunk: Buffer) => chunks.push(chunk));
+            response.on("end", () => callback(null, Buffer.concat(chunks)));
+          })
+          .set("Authorization", `Bearer ${owner.accessToken}`);
+      }
+
+      const first = await bufferedExport();
+      const second = await bufferedExport();
+
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(200);
+      expect((second.body as Buffer).equals(first.body as Buffer)).toBe(true);
+    });
+
+    it("rejects exporting a report belonging to another project", async () => {
+      const owner = await registerUser("reports-export-scope-owner");
+      const projectA = await createProject(owner.accessToken, "Export Scope A");
+      const projectB = await createProject(owner.accessToken, "Export Scope B");
+      const node = await createNode(owner.accessToken, projectA.id, "In A");
+      const report = await assembleReport(owner.accessToken, projectA.id, node.id);
+
+      const res = await request(server())
+        .get(`/api/v1/projects/${projectB.id}/reports/${report.id}/export`)
+        .query({ format: "pdf" })
+        .set("Authorization", `Bearer ${owner.accessToken}`);
+
+      expect(res.status).toBe(404);
+    });
+
+    it("rejects a non-member from exporting a report", async () => {
+      const owner = await registerUser("reports-export-rbac-owner");
+      const outsider = await registerUser("reports-export-rbac-outsider");
+      const project = await createProject(owner.accessToken, "Export RBAC Project");
+      const node = await createNode(owner.accessToken, project.id, "Guarded finding");
+      const report = await assembleReport(owner.accessToken, project.id, node.id);
+
+      const res = await request(server())
+        .get(`/api/v1/projects/${project.id}/reports/${report.id}/export`)
+        .query({ format: "pdf" })
+        .set("Authorization", `Bearer ${outsider.accessToken}`);
+
+      expect(res.status).toBe(403);
+    });
+  });
 });
