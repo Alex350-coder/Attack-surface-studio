@@ -14,7 +14,9 @@ import type { ReportExportsRepository } from "../knowledge/repositories/report-e
 import type { ReportRow, ReportsRepository } from "../knowledge/repositories/reports.repository";
 import type { Paginated, PaginationParams } from "../shared/repository.types";
 import type { CreateReportDto } from "./dto/create-report.dto";
-import type { ReportExportFormat, ReportGraphSnapshot, RenderedReport } from "./rendering/report-rendering.types";
+import { statesThatCanTransitionTo } from "./policies/report-status.policy";
+import type { ReportExportFormat, RenderedReport } from "./rendering/report-rendering.types";
+import { reportGraphSnapshotSchema } from "./rendering/report-rendering.types";
 import { EXTENSIONS, MIME_TYPES, ReportRendererService } from "./rendering/report-renderer.service";
 
 /**
@@ -74,7 +76,11 @@ export class ReportsService {
    * idempotent-by-cache: a second call for the same (reportId, format) returns the exact same
    * bytes without re-rendering, which is what makes "regenerating yields consistent content"
    * true by construction. Status transitions are atomic and allow-listed (OWA-020/OWA-021);
-   * a lost race on `generating` surfaces as a 409, never a silent overwrite.
+   * a lost race on `generating` surfaces as a 409, never a silent overwrite. The `generating`
+   * lock is per-report, not per-format: two concurrent first-time exports of the same report in
+   * different formats will also collide with a 409, not just two requests for the same format.
+   * This is an intentional simplification (single in-flight export per report) rather than a
+   * per-format lock; a rejected request can simply be retried once the first export finishes.
    */
   async exportReport(
     projectId: string,
@@ -92,7 +98,7 @@ export class ReportsService {
     }
 
     const generating = await this.reportsRepository.transitionStatus(projectId, reportId, {
-      from: ["draft", "ready", "failed"],
+      from: statesThatCanTransitionTo("generating"),
       to: "generating",
     });
     if (!generating) {
@@ -100,7 +106,7 @@ export class ReportsService {
     }
 
     try {
-      const snapshot = toRenderSnapshot(report.graphSnapshot);
+      const snapshot = reportGraphSnapshotSchema.parse(report.graphSnapshot);
       const rendered = await this.renderer.render(format, snapshot, report.title);
       const putResult = await this.blobStorage.put(rendered.buffer);
       await this.reportExportsRepository.upsert({
@@ -112,7 +118,7 @@ export class ReportsService {
         generatedBy: actingUserId,
       });
       await this.reportsRepository.transitionStatus(projectId, reportId, {
-        from: ["generating"],
+        from: statesThatCanTransitionTo("ready"),
         to: "ready",
       });
       this.logger.log({
@@ -126,10 +132,21 @@ export class ReportsService {
       });
       return rendered;
     } catch (error) {
-      await this.reportsRepository.transitionStatus(projectId, reportId, {
-        from: ["generating"],
-        to: "failed",
-      });
+      try {
+        await this.reportsRepository.transitionStatus(projectId, reportId, {
+          from: statesThatCanTransitionTo("failed"),
+          to: "failed",
+        });
+      } catch (transitionError) {
+        this.logger.error({
+          event: "report.export.transition_failed",
+          actorUserId: actingUserId,
+          projectId,
+          reportId,
+          format,
+          error: transitionError instanceof Error ? transitionError.message : String(transitionError),
+        });
+      }
       this.logger.error({
         event: "report.export",
         actorUserId: actingUserId,
@@ -138,15 +155,9 @@ export class ReportsService {
         format,
         outcome: "failure",
         correlationId,
+        error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }
   }
-}
-
-function toRenderSnapshot(graphSnapshot: Record<string, unknown>): ReportGraphSnapshot {
-  return {
-    nodes: Array.isArray(graphSnapshot.nodes) ? (graphSnapshot.nodes as ReportGraphSnapshot["nodes"]) : [],
-    edges: Array.isArray(graphSnapshot.edges) ? (graphSnapshot.edges as ReportGraphSnapshot["edges"]) : [],
-  };
 }

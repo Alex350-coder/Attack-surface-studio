@@ -76,7 +76,7 @@ export class ReportsController {
       reportId,
       requireUserId(request),
       query.format,
-      request.headers["x-correlation-id"] as string | undefined,
+      request.correlationId,
     );
     response
       .status(200)

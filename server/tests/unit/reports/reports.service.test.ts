@@ -56,7 +56,7 @@ function makeReportRow(overrides: Partial<ReportRow> = {}): ReportRow {
     projectId: PROJECT_ID,
     title: "External Attack Surface",
     status: "draft",
-    graphSnapshot: {},
+    graphSnapshot: { nodes: [], edges: [] },
     contentRef: null,
     generatedBy: USER_ID,
     createdAt: new Date(),
@@ -107,12 +107,12 @@ describe("ReportsService", () => {
       findByReportAndFormat: vi.fn().mockResolvedValue(null),
       upsert: vi.fn().mockResolvedValue(makeReportExportRow()),
       ...overrides.reportExports,
-    } as unknown as ReportExportsRepository;
+    };
     const blobStorage = {
       put: vi.fn().mockResolvedValue({ ref: "sha256/aa/bb/newref", hash: "newref", byteSize: 42 }),
       get: vi.fn().mockResolvedValue(Buffer.from("cached-bytes")),
       ...overrides.blobStorage,
-    } as unknown as BlobStorage;
+    };
     const renderer = new ReportRendererService();
 
     return new ReportsService(
@@ -202,5 +202,36 @@ describe("ReportsService", () => {
       "55555555-5555-5555-5555-555555555555",
       expect.objectContaining({ to: "failed" }),
     );
+  });
+
+  it("rejects a malformed stored graph snapshot instead of rendering unvalidated data", async () => {
+    const reports = {
+      findById: vi.fn().mockResolvedValue(makeReportRow({ graphSnapshot: { nodes: "not-an-array", edges: [] } })),
+      transitionStatus: vi.fn().mockResolvedValue(makeReportRow({ status: "generating" })),
+    };
+    const service = buildService({ reports });
+
+    await expect(
+      service.exportReport(PROJECT_ID, "55555555-5555-5555-5555-555555555555", USER_ID, "pdf"),
+    ).rejects.toThrow();
+
+    expect(reports.transitionStatus).toHaveBeenCalledWith(
+      PROJECT_ID,
+      "55555555-5555-5555-5555-555555555555",
+      expect.objectContaining({ to: "failed" }),
+    );
+  });
+
+  it("re-throws the original render error even if the failed-transition itself throws", async () => {
+    const transitionStatus = vi
+      .fn()
+      .mockResolvedValueOnce(makeReportRow({ status: "generating" }))
+      .mockRejectedValueOnce(new Error("db connection lost"));
+    const service = buildService({ reports: { transitionStatus } });
+    vi.spyOn(ReportRendererService.prototype, "render").mockRejectedValueOnce(new Error("render blew up"));
+
+    await expect(
+      service.exportReport(PROJECT_ID, "55555555-5555-5555-5555-555555555555", USER_ID, "pdf"),
+    ).rejects.toThrow("render blew up");
   });
 });

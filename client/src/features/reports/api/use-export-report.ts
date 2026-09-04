@@ -11,14 +11,24 @@ const EXTENSIONS: Record<ReportExportFormat, string> = {
   markdown: "md",
 };
 
-/** Triggers a browser download from an in-memory blob, revoking the object URL right after the click. */
+/**
+ * Triggers a browser download from an in-memory blob. The anchor is appended to the DOM before
+ * clicking (Firefox/Safari require this for a synthetic click to reliably start a download) and
+ * the object URL is revoked in a `finally` on the next tick, after the browser has had a chance
+ * to start reading it -- revoking synchronously can abort the download in some browsers.
+ */
 function triggerBrowserDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
+  document.body.appendChild(link);
+  try {
+    link.click();
+  } finally {
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
 }
 
 interface ExportReportInput {
