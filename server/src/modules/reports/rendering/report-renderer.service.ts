@@ -4,13 +4,13 @@ import { renderReportMarkdown } from "./report-markdown.renderer";
 import { renderReportPdf } from "./report-pdf.renderer";
 import type { RenderedReport, ReportExportFormat, ReportGraphSnapshot } from "./report-rendering.types";
 
-const MIME_TYPES: Record<ReportExportFormat, string> = {
+export const MIME_TYPES: Record<ReportExportFormat, string> = {
   pdf: "application/pdf",
   html: "text/html; charset=utf-8",
   markdown: "text/markdown; charset=utf-8",
 };
 
-const EXTENSIONS: Record<ReportExportFormat, string> = {
+export const EXTENSIONS: Record<ReportExportFormat, string> = {
   pdf: "pdf",
   html: "html",
   markdown: "md",
