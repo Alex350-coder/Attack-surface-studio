@@ -94,7 +94,9 @@ describe("OrchestratorService", () => {
         }),
       ).rejects.toThrow(ScopeViolationError);
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.fn() mock, not a bound class method
       expect(toolRunsRepository.create).not.toHaveBeenCalled();
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.fn() mock, not a bound class method
       expect(queue.enqueue).not.toHaveBeenCalled();
     });
 
@@ -117,10 +119,12 @@ describe("OrchestratorService", () => {
       });
 
       expect(dto.id).toBe(RUN_ID);
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.fn() mock, not a bound class method
       expect(toolRunsRepository.create).toHaveBeenCalledWith(
         PROJECT_ID,
         expect.objectContaining({ adapterId: "stub", target: "example.com", triggeredBy: USER_ID }),
       );
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.fn() mock, not a bound class method
       expect(queue.enqueue).toHaveBeenCalledWith(
         expect.objectContaining({ runId: RUN_ID, projectId: PROJECT_ID, triggeredBy: USER_ID }),
       );
@@ -132,6 +136,7 @@ describe("OrchestratorService", () => {
       toolRunsRepository.findById.mockResolvedValue(makeRun({ status: "succeeded" }));
 
       await expect(service.cancelRun(PROJECT_ID, RUN_ID)).rejects.toThrow(ConflictError);
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.fn() mock, not a bound class method
       expect(toolRunsRepository.updateStatus).not.toHaveBeenCalled();
     });
 
@@ -148,12 +153,14 @@ describe("OrchestratorService", () => {
       const dto = await service.cancelRun(PROJECT_ID, RUN_ID);
 
       expect(dto.status).toBe("cancelled");
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.fn() mock, not a bound class method
       expect(toolRunsRepository.updateStatus).toHaveBeenCalledWith(
         PROJECT_ID,
         RUN_ID,
         expect.objectContaining({ status: "cancelled" }),
         ["queued", "running"],
       );
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.fn() mock, not a bound class method
       expect(queue.requestCancel).toHaveBeenCalledWith(RUN_ID);
     });
 
@@ -162,6 +169,7 @@ describe("OrchestratorService", () => {
       toolRunsRepository.updateStatus.mockResolvedValue(null);
 
       await expect(service.cancelRun(PROJECT_ID, RUN_ID)).rejects.toThrow(ConflictError);
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.fn() mock, not a bound class method
       expect(queue.requestCancel).not.toHaveBeenCalled();
     });
   });

@@ -210,7 +210,7 @@ describe("Evidence upload and notes (POST /api/v1/projects/:id/evidence, /notes)
     expect(contentRes.status).toBe(200);
     expect(contentRes.headers["content-type"]).toBe("image/png");
     expect(contentRes.headers["content-disposition"]).toContain("inline");
-    expect(Buffer.isBuffer(contentRes.body) ? (contentRes.body as Buffer).equals(PNG_SIGNATURE) : false).toBe(true);
+    expect(Buffer.isBuffer(contentRes.body) ? contentRes.body.equals(PNG_SIGNATURE) : false).toBe(true);
   });
 
   it("returns 404 for an evidence content id that does not exist in the project", async () => {

@@ -116,6 +116,7 @@ describe("ProjectsService", () => {
       await expect(
         service.createProject(OWNER_ID, { name: "Test Project", slug: "test-project" }),
       ).rejects.toBeInstanceOf(ConflictError);
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.fn() mock, not a bound class method
       expect(projectsRepository.createWithOwner).not.toHaveBeenCalled();
     });
 
@@ -125,6 +126,7 @@ describe("ProjectsService", () => {
 
       const result = await service.createProject(OWNER_ID, { name: "Test Project", slug: "test-project" });
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.fn() mock, not a bound class method
       expect(projectsRepository.createWithOwner).toHaveBeenCalledWith(
         expect.objectContaining({ name: "Test Project", slug: "test-project", createdBy: OWNER_ID }),
       );
@@ -159,8 +161,8 @@ describe("ProjectsService", () => {
     });
 
     it("rejects a non-owner assigning the owner role", async () => {
-      projectMembersRepository.findByProjectAndUser.mockImplementation(async (_projectId, userId) =>
-        userId === OWNER_ID ? makeMembership({ userId: OWNER_ID, role: "admin" }) : null,
+      projectMembersRepository.findByProjectAndUser.mockImplementation((_projectId, userId) =>
+        Promise.resolve(userId === OWNER_ID ? makeMembership({ userId: OWNER_ID, role: "admin" }) : null),
       );
       usersRepository.findByEmail.mockResolvedValue(makeUser());
 
@@ -170,8 +172,8 @@ describe("ProjectsService", () => {
     });
 
     it("adds a new member when the assignment is permitted", async () => {
-      projectMembersRepository.findByProjectAndUser.mockImplementation(async (_projectId, userId) =>
-        userId === OWNER_ID ? makeMembership({ userId: OWNER_ID, role: "owner" }) : null,
+      projectMembersRepository.findByProjectAndUser.mockImplementation((_projectId, userId) =>
+        Promise.resolve(userId === OWNER_ID ? makeMembership({ userId: OWNER_ID, role: "owner" }) : null),
       );
       usersRepository.findByEmail.mockResolvedValue(makeUser());
       projectMembersRepository.addMember.mockResolvedValue(
@@ -183,6 +185,7 @@ describe("ProjectsService", () => {
         role: "member",
       });
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.fn() mock, not a bound class method
       expect(projectMembersRepository.addMember).toHaveBeenCalledWith({
         projectId: PROJECT_ID,
         userId: OTHER_USER_ID,
@@ -212,7 +215,7 @@ describe("ProjectsService", () => {
         updatedAt: new Date(),
         lastSeenAt: new Date(),
         deletedAt: null,
-      } as NodeRow;
+      };
       const edge: EdgeRow = {
         id: edgeId,
         projectId: PROJECT_ID,
