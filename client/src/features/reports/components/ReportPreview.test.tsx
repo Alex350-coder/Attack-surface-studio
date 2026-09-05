@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { ReportPreview } from "./ReportPreview";
 import { useReport } from "../api/use-report";
@@ -11,6 +12,15 @@ vi.mock("@/modules/graph-engine", () => ({
     <div data-testid="graph-engine">{data.nodes.length} nodes</div>
   ),
 }));
+
+function renderReportPreview(projectId: string, reportId: string) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ReportPreview projectId={projectId} reportId={reportId} />
+    </QueryClientProvider>,
+  );
+}
 
 function queryResult(overrides: Partial<UseQueryResult<Report>>): UseQueryResult<Report> {
   return {
@@ -48,25 +58,25 @@ describe("ReportPreview", () => {
 
   it("shows a loading state", () => {
     vi.mocked(useReport).mockReturnValue(queryResult({ isLoading: true }));
-    render(<ReportPreview projectId={PROJECT_ID} reportId={REPORT_ID} />);
+    renderReportPreview(PROJECT_ID, REPORT_ID);
     expect(screen.getByText("Loading report…")).toBeInTheDocument();
   });
 
   it("shows an error state", () => {
     vi.mocked(useReport).mockReturnValue(queryResult({ isError: true, error: new Error("boom") }));
-    render(<ReportPreview projectId={PROJECT_ID} reportId={REPORT_ID} />);
+    renderReportPreview(PROJECT_ID, REPORT_ID);
     expect(screen.getByRole("alert")).toHaveTextContent("Failed to load this report.");
   });
 
   it("shows a not-found state", () => {
     vi.mocked(useReport).mockReturnValue(queryResult({ data: undefined }));
-    render(<ReportPreview projectId={PROJECT_ID} reportId={REPORT_ID} />);
+    renderReportPreview(PROJECT_ID, REPORT_ID);
     expect(screen.getByText("Report not found.")).toBeInTheDocument();
   });
 
   it("renders the title, status badge, and the graph snapshot through GraphEngine", () => {
     vi.mocked(useReport).mockReturnValue(queryResult({ data: makeReport() }));
-    render(<ReportPreview projectId={PROJECT_ID} reportId={REPORT_ID} />);
+    renderReportPreview(PROJECT_ID, REPORT_ID);
     expect(screen.getByRole("heading", { name: "Q1 findings" })).toBeInTheDocument();
     expect(screen.getByText("draft")).toBeInTheDocument();
     expect(screen.getByTestId("graph-engine")).toHaveTextContent("0 nodes");

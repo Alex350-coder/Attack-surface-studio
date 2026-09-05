@@ -12,6 +12,7 @@ import { DrizzleRawOutputsRepository } from "./repositories/raw-outputs.reposito
 import { DrizzleEvidenceFilesRepository } from "./repositories/evidence-files.repository";
 import { DrizzleNotesRepository } from "./repositories/notes.repository";
 import { DrizzleReportsRepository } from "./repositories/reports.repository";
+import { DrizzleReportExportsRepository } from "./repositories/report-exports.repository";
 import { GraphBuilderService } from "./graph-builder.service";
 import { KnowledgeController } from "./knowledge.controller";
 import { KnowledgeService } from "./knowledge.service";
@@ -25,6 +26,7 @@ import {
   NODES_REPOSITORY,
   NOTES_REPOSITORY,
   RAW_OUTPUTS_REPOSITORY,
+  REPORT_EXPORTS_REPOSITORY,
   REPORTS_REPOSITORY,
   TOOL_RUNS_REPOSITORY,
 } from "./knowledge.tokens";
@@ -38,6 +40,7 @@ const REPOSITORY_TOKENS = [
   EVIDENCE_FILES_REPOSITORY,
   NOTES_REPOSITORY,
   REPORTS_REPOSITORY,
+  REPORT_EXPORTS_REPOSITORY,
 ];
 
 @Module({
@@ -83,6 +86,11 @@ const REPOSITORY_TOKENS = [
     {
       provide: REPORTS_REPOSITORY,
       useFactory: (db: Database) => new DrizzleReportsRepository(db),
+      inject: [DATABASE_CONNECTION],
+    },
+    {
+      provide: REPORT_EXPORTS_REPOSITORY,
+      useFactory: (db: Database) => new DrizzleReportExportsRepository(db),
       inject: [DATABASE_CONNECTION],
     },
     {

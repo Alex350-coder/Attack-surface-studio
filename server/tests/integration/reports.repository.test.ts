@@ -46,4 +46,38 @@ describe("ReportsRepository", () => {
 
     expect(await repo.findById(otherProjectId, report.id)).toBeNull();
   });
+
+  it("transitions status atomically when the current status matches", async () => {
+    const report = await repo.create(projectId, { title: "External Attack Surface" });
+
+    const transitioned = await repo.transitionStatus(projectId, report.id, {
+      from: ["draft"],
+      to: "generating",
+    });
+
+    expect(transitioned).toMatchObject({ status: "generating" });
+  });
+
+  it("returns null and does not change status when the current status does not match", async () => {
+    const report = await repo.create(projectId, { title: "External Attack Surface" });
+
+    const result = await repo.transitionStatus(projectId, report.id, {
+      from: ["generating"],
+      to: "ready",
+    });
+
+    expect(result).toBeNull();
+    expect(await repo.findById(projectId, report.id)).toMatchObject({ status: "draft" });
+  });
+
+  it("does not transition a report belonging to another project", async () => {
+    const report = await repo.create(projectId, { title: "External Attack Surface" });
+
+    const result = await repo.transitionStatus(otherProjectId, report.id, {
+      from: ["draft"],
+      to: "generating",
+    });
+
+    expect(result).toBeNull();
+  });
 });

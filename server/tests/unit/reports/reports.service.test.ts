@@ -3,7 +3,13 @@ import { ReportsService } from "../../../src/modules/reports/reports.service";
 import type { NodeRow, NodesRepository } from "../../../src/modules/knowledge/repositories/nodes.repository";
 import type { EdgeRow, EdgesRepository } from "../../../src/modules/knowledge/repositories/edges.repository";
 import type { ReportRow, ReportsRepository } from "../../../src/modules/knowledge/repositories/reports.repository";
-import { NotFoundError } from "../../../src/core/http/domain-error";
+import type {
+  ReportExportRow,
+  ReportExportsRepository,
+} from "../../../src/modules/knowledge/repositories/report-exports.repository";
+import type { BlobStorage } from "../../../src/core/storage/blob-storage.contract";
+import { ReportRendererService } from "../../../src/modules/reports/rendering/report-renderer.service";
+import { ConflictError, NotFoundError } from "../../../src/core/http/domain-error";
 
 const PROJECT_ID = "11111111-1111-1111-1111-111111111111";
 const USER_ID = "22222222-2222-2222-2222-222222222222";
@@ -50,7 +56,7 @@ function makeReportRow(overrides: Partial<ReportRow> = {}): ReportRow {
     projectId: PROJECT_ID,
     title: "External Attack Surface",
     status: "draft",
-    graphSnapshot: {},
+    graphSnapshot: { nodes: [], edges: [] },
     contentRef: null,
     generatedBy: USER_ID,
     createdAt: new Date(),
@@ -60,11 +66,27 @@ function makeReportRow(overrides: Partial<ReportRow> = {}): ReportRow {
   };
 }
 
+function makeReportExportRow(overrides: Partial<ReportExportRow> = {}): ReportExportRow {
+  return {
+    id: "66666666-6666-6666-6666-666666666666",
+    reportId: "55555555-5555-5555-5555-555555555555",
+    format: "pdf",
+    blobRef: "sha256/aa/bb/cachedref",
+    checksum: "cachedref",
+    byteSize: 100,
+    generatedBy: USER_ID,
+    createdAt: new Date(),
+    ...overrides,
+  };
+}
+
 describe("ReportsService", () => {
   function buildService(overrides: {
     nodes?: Partial<NodesRepository>;
     edges?: Partial<EdgesRepository>;
     reports?: Partial<ReportsRepository>;
+    reportExports?: Partial<ReportExportsRepository>;
+    blobStorage?: Partial<BlobStorage>;
   } = {}) {
     const nodesRepository = {
       findById: vi.fn().mockResolvedValue(makeNodeRow()),
@@ -78,10 +100,29 @@ describe("ReportsService", () => {
       create: vi.fn().mockResolvedValue(makeReportRow()),
       findById: vi.fn().mockResolvedValue(makeReportRow()),
       listByProject: vi.fn().mockResolvedValue({ items: [makeReportRow()], page: 1, pageSize: 20, total: 1 }),
+      transitionStatus: vi.fn().mockResolvedValue(makeReportRow({ status: "generating" })),
       ...overrides.reports,
     } as unknown as ReportsRepository;
+    const reportExportsRepository = {
+      findByReportAndFormat: vi.fn().mockResolvedValue(null),
+      upsert: vi.fn().mockResolvedValue(makeReportExportRow()),
+      ...overrides.reportExports,
+    };
+    const blobStorage = {
+      put: vi.fn().mockResolvedValue({ ref: "sha256/aa/bb/newref", hash: "newref", byteSize: 42 }),
+      get: vi.fn().mockResolvedValue(Buffer.from("cached-bytes")),
+      ...overrides.blobStorage,
+    };
+    const renderer = new ReportRendererService();
 
-    return new ReportsService(reportsRepository, nodesRepository, edgesRepository);
+    return new ReportsService(
+      reportsRepository,
+      nodesRepository,
+      edgesRepository,
+      reportExportsRepository,
+      blobStorage,
+      renderer,
+    );
   }
 
   it("assembles a draft report from resolved node/edge ids", async () => {
@@ -116,5 +157,81 @@ describe("ReportsService", () => {
     const service = buildService({ reports: { findById: vi.fn().mockResolvedValue(null) } });
 
     await expect(service.getReport(PROJECT_ID, "does-not-exist")).rejects.toThrow(NotFoundError);
+  });
+
+  it("returns a cached export without re-rendering or transitioning status", async () => {
+    const findByReportAndFormat = vi.fn().mockResolvedValue(makeReportExportRow());
+    const get = vi.fn().mockResolvedValue(Buffer.from("cached-bytes"));
+    const transitionStatus = vi.fn();
+    const service = buildService({
+      reportExports: { findByReportAndFormat },
+      blobStorage: { get },
+      reports: { transitionStatus },
+    });
+
+    const result = await service.exportReport(PROJECT_ID, "55555555-5555-5555-5555-555555555555", USER_ID, "pdf");
+
+    expect(result.buffer.toString()).toBe("cached-bytes");
+    expect(get).toHaveBeenCalledWith("sha256/aa/bb/cachedref");
+    expect(transitionStatus).not.toHaveBeenCalled();
+  });
+
+  it("throws ConflictError when the generating transition is lost to a concurrent export", async () => {
+    const service = buildService({
+      reports: { transitionStatus: vi.fn().mockResolvedValue(null) },
+    });
+
+    await expect(
+      service.exportReport(PROJECT_ID, "55555555-5555-5555-5555-555555555555", USER_ID, "pdf"),
+    ).rejects.toThrow(ConflictError);
+  });
+
+  it("transitions the report to failed and rethrows when rendering fails", async () => {
+    const transitionStatus = vi.fn().mockResolvedValue(makeReportRow({ status: "generating" }));
+    const service = buildService({
+      reports: { transitionStatus },
+    });
+    vi.spyOn(ReportRendererService.prototype, "render").mockRejectedValueOnce(new Error("render blew up"));
+
+    await expect(
+      service.exportReport(PROJECT_ID, "55555555-5555-5555-5555-555555555555", USER_ID, "pdf"),
+    ).rejects.toThrow("render blew up");
+
+    expect(transitionStatus).toHaveBeenCalledWith(
+      PROJECT_ID,
+      "55555555-5555-5555-5555-555555555555",
+      expect.objectContaining({ to: "failed" }),
+    );
+  });
+
+  it("rejects a malformed stored graph snapshot instead of rendering unvalidated data", async () => {
+    const reports = {
+      findById: vi.fn().mockResolvedValue(makeReportRow({ graphSnapshot: { nodes: "not-an-array", edges: [] } })),
+      transitionStatus: vi.fn().mockResolvedValue(makeReportRow({ status: "generating" })),
+    };
+    const service = buildService({ reports });
+
+    await expect(
+      service.exportReport(PROJECT_ID, "55555555-5555-5555-5555-555555555555", USER_ID, "pdf"),
+    ).rejects.toThrow();
+
+    expect(reports.transitionStatus).toHaveBeenCalledWith(
+      PROJECT_ID,
+      "55555555-5555-5555-5555-555555555555",
+      expect.objectContaining({ to: "failed" }),
+    );
+  });
+
+  it("re-throws the original render error even if the failed-transition itself throws", async () => {
+    const transitionStatus = vi
+      .fn()
+      .mockResolvedValueOnce(makeReportRow({ status: "generating" }))
+      .mockRejectedValueOnce(new Error("db connection lost"));
+    const service = buildService({ reports: { transitionStatus } });
+    vi.spyOn(ReportRendererService.prototype, "render").mockRejectedValueOnce(new Error("render blew up"));
+
+    await expect(
+      service.exportReport(PROJECT_ID, "55555555-5555-5555-5555-555555555555", USER_ID, "pdf"),
+    ).rejects.toThrow("render blew up");
   });
 });
