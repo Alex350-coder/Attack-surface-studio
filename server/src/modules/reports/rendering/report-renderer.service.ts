@@ -3,18 +3,9 @@ import { renderReportHtml } from "./report-html.renderer";
 import { renderReportMarkdown } from "./report-markdown.renderer";
 import { renderReportPdf } from "./report-pdf.renderer";
 import type { RenderedReport, ReportExportFormat, ReportGraphSnapshot } from "./report-rendering.types";
+import { REPORT_EXPORT_EXTENSIONS as EXTENSIONS, REPORT_EXPORT_MIME_TYPES as MIME_TYPES } from "../../../contracts/report-export.schema";
 
-export const MIME_TYPES: Record<ReportExportFormat, string> = {
-  pdf: "application/pdf",
-  html: "text/html; charset=utf-8",
-  markdown: "text/markdown; charset=utf-8",
-};
-
-export const EXTENSIONS: Record<ReportExportFormat, string> = {
-  pdf: "pdf",
-  html: "html",
-  markdown: "md",
-};
+export { EXTENSIONS, MIME_TYPES };
 
 /**
  * Pure, deterministic, in-process rendering over an already-fetched graph snapshot -- no

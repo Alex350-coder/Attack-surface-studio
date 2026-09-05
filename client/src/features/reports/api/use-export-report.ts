@@ -2,14 +2,9 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { apiRequestBlob } from "@/lib/api-client";
+import { REPORT_EXPORT_EXTENSIONS as EXTENSIONS, type ReportExportFormat } from "@/lib/server-contracts";
 
-export type ReportExportFormat = "pdf" | "html" | "markdown";
-
-const EXTENSIONS: Record<ReportExportFormat, string> = {
-  pdf: "pdf",
-  html: "html",
-  markdown: "md",
-};
+export type { ReportExportFormat };
 
 /**
  * Triggers a browser download from an in-memory blob. The anchor is appended to the DOM before
