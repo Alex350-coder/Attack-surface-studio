@@ -90,6 +90,18 @@ export class ProjectsController {
     return this.projectsService.addOrAssignMember(requireUserId(request), projectId, body);
   }
 
+  @Delete(":projectId/members/:userId")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("owner", "admin")
+  async removeMember(
+    @Req() request: Request,
+    @Param("projectId") projectId: string,
+    @Param("userId") userId: string,
+  ): Promise<{ success: true }> {
+    await this.projectsService.removeMember(requireUserId(request), projectId, userId);
+    return { success: true };
+  }
+
   @Get(":projectId/graph")
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(...PROJECT_ROLES)

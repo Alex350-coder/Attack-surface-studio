@@ -11,7 +11,7 @@ import type { UsersRepository } from "../users/repositories/users.repository";
 import type { CreateProjectDto, UpdateProjectDto } from "./dto/project.dto";
 import type { AddOrAssignMemberDto } from "./dto/project-member.dto";
 import { toProjectDto, toProjectMemberDto, type ProjectDto, type ProjectMemberDto } from "./mappers/project.mapper";
-import { canAssignRole } from "./policies/project-member.policy";
+import { canAssignRole, canRemoveMember } from "./policies/project-member.policy";
 import { PROJECT_MEMBERS_REPOSITORY, PROJECTS_REPOSITORY } from "./projects.tokens";
 import type { ProjectMembersRepository } from "./repositories/project-members.repository";
 import type { ProjectRow, ProjectsRepository } from "./repositories/projects.repository";
@@ -104,6 +104,26 @@ export class ProjectsService {
       throw new NotFoundError("Project membership not found");
     }
     return toProjectMemberDto(result);
+  }
+
+  async removeMember(actingUserId: string, projectId: string, targetUserId: string): Promise<void> {
+    const actingMembership = await this.projectMembersRepository.findByProjectAndUser(projectId, actingUserId);
+    if (!actingMembership) {
+      throw new ForbiddenError("You are not a member of this project");
+    }
+    if (targetUserId === actingUserId) {
+      throw new ForbiddenError("You cannot remove yourself from the project");
+    }
+
+    const targetMembership = await this.projectMembersRepository.findByProjectAndUser(projectId, targetUserId);
+    if (!targetMembership) {
+      throw new NotFoundError("Project membership not found");
+    }
+    if (!canRemoveMember(actingMembership.role, targetMembership.role)) {
+      throw new ForbiddenError("You are not allowed to remove this member");
+    }
+
+    await this.projectMembersRepository.removeMember(projectId, targetUserId);
   }
 
   /** Returns only normalized graph objects (ARC-001) — never raw tool output. */

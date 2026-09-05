@@ -298,6 +298,61 @@ describe("Projects flows (POST/GET/PATCH/DELETE /api/v1/projects/*)", () => {
     expect(adminDemotesOwnerRes.status).toBe(403);
   });
 
+  it("lets an owner remove a member, and enforces removal permissions", async () => {
+    const owner = await registerUser("remove-owner");
+    const admin = await registerUser("remove-admin");
+    const member = await registerUser("remove-member");
+
+    const createRes = await request(server())
+      .post("/api/v1/projects")
+      .set("Authorization", `Bearer ${owner.accessToken}`)
+      .send({ name: "Removal Project", slug: `removal-project-${Date.now()}` });
+    const project = dataOf<ProjectBody>(createRes);
+
+    const initialMembersRes = await request(server())
+      .get(`/api/v1/projects/${project.id}/members`)
+      .set("Authorization", `Bearer ${owner.accessToken}`);
+    const ownerUserId = dataOf<MemberBody[]>(initialMembersRes).find((m) => m.role === "owner")!.userId;
+
+    const addAdminRes = await request(server())
+      .post(`/api/v1/projects/${project.id}/members`)
+      .set("Authorization", `Bearer ${owner.accessToken}`)
+      .send({ email: admin.email, role: "admin" });
+    const adminMembership = dataOf<MemberBody>(addAdminRes);
+
+    const addMemberRes = await request(server())
+      .post(`/api/v1/projects/${project.id}/members`)
+      .set("Authorization", `Bearer ${owner.accessToken}`)
+      .send({ email: member.email, role: "member" });
+    const memberMembership = dataOf<MemberBody>(addMemberRes);
+
+    const selfRemoveRes = await request(server())
+      .delete(`/api/v1/projects/${project.id}/members/${ownerUserId}`)
+      .set("Authorization", `Bearer ${owner.accessToken}`);
+    expect(selfRemoveRes.status).toBe(403);
+
+    const adminRemovesOwnerRes = await request(server())
+      .delete(`/api/v1/projects/${project.id}/members/${ownerUserId}`)
+      .set("Authorization", `Bearer ${admin.accessToken}`);
+    expect(adminRemovesOwnerRes.status).toBe(403);
+
+    const memberRemovesAdminRes = await request(server())
+      .delete(`/api/v1/projects/${project.id}/members/${adminMembership.userId}`)
+      .set("Authorization", `Bearer ${member.accessToken}`);
+    expect(memberRemovesAdminRes.status).toBe(403);
+
+    const removeRes = await request(server())
+      .delete(`/api/v1/projects/${project.id}/members/${memberMembership.userId}`)
+      .set("Authorization", `Bearer ${owner.accessToken}`);
+    expect(removeRes.status).toBe(200);
+
+    const membersAfterRes = await request(server())
+      .get(`/api/v1/projects/${project.id}/members`)
+      .set("Authorization", `Bearer ${owner.accessToken}`);
+    const membersAfter = dataOf<MemberBody[]>(membersAfterRes);
+    expect(membersAfter.map((m) => m.userId)).not.toContain(memberMembership.userId);
+  });
+
   it("only lets the owner soft-delete a project", async () => {
     const owner = await registerUser("delete-owner");
     const admin = await registerUser("delete-admin");
