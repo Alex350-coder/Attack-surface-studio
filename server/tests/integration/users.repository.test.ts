@@ -26,6 +26,13 @@ describe("UsersRepository", () => {
     expect(await repo.findByEmail("a@example.com")).toMatchObject({ id: created.id });
   });
 
+  it("treats email as case-insensitive for lookup and uniqueness (citext)", async () => {
+    const created = await repo.create({ email: "Mixed.Case@Example.com", passwordHash: "hash" });
+
+    expect(await repo.findByEmail("mixed.case@example.com")).toMatchObject({ id: created.id });
+    await expect(repo.create({ email: "MIXED.CASE@EXAMPLE.COM", passwordHash: "hash2" })).rejects.toThrow();
+  });
+
   it("excludes soft-deleted users from lookups", async () => {
     const created = await repo.create({ email: "b@example.com", passwordHash: "hash" });
     await repo.softDelete(created.id);

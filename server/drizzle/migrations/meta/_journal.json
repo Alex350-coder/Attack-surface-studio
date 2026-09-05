@@ -57,6 +57,13 @@
       "when": 1788539009041,
       "tag": "0007_add_report_exports",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788641260998,
+      "tag": "0008_cool_kulan_gath",
+      "breakpoints": true
     }
   ]
 }
