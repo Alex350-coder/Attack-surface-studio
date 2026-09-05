@@ -1,19 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useUploadEvidence } from "./use-upload-evidence";
 import { apiUpload } from "@/lib/api-client";
+import { queryClientWrapper } from "@/lib/test/query-client-wrapper";
 
 vi.mock("@/lib/api-client", () => ({ apiUpload: vi.fn() }));
 
 const PROJECT_ID = "11111111-1111-1111-1111-111111111111";
-
-function wrapper() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
-}
 
 describe("useUploadEvidence", () => {
   afterEach(() => vi.clearAllMocks());
@@ -32,7 +25,7 @@ describe("useUploadEvidence", () => {
       deletedAt: null,
     });
 
-    const { result } = renderHook(() => useUploadEvidence(PROJECT_ID), { wrapper: wrapper() });
+    const { result } = renderHook(() => useUploadEvidence(PROJECT_ID), { wrapper: queryClientWrapper() });
     const file = new File(["x"], "shot.png", { type: "image/png" });
     result.current.mutate({ file, label: "Screenshot" });
 

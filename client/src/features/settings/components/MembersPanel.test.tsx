@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
 import { MembersPanel } from "./MembersPanel";
 import { useAddOrAssignMember, useProjectMembers, type ProjectMember } from "../api/use-project-members";
 

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
 import { ToolConfigPanel } from "./ToolConfigPanel";
 import { useTools, type ToolListing } from "@/features/runs/api/use-tools";
 import { useDetectTool, useSetToolConfig, useToolConfig, type DetectionResult, type ToolConfig } from "../api/use-tool-config";

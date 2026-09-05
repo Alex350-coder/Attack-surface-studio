@@ -10,8 +10,12 @@ type Props = {
   projectId: string;
 };
 
-const SECTIONS = ["scope", "members", "tools"] as const;
-type Section = (typeof SECTIONS)[number];
+const SECTIONS = [
+  { value: "scope", label: "Scope" },
+  { value: "members", label: "Members" },
+  { value: "tools", label: "Tools" },
+] as const;
+type Section = (typeof SECTIONS)[number]["value"];
 
 export function SettingsPage({ projectId }: Props) {
   const [section, setSection] = useState<Section>("scope");
@@ -21,9 +25,11 @@ export function SettingsPage({ projectId }: Props) {
       <h1 className="text-xl font-semibold">Settings</h1>
       <Tabs value={section} onChange={(value) => setSection(value as Section)}>
         <Tabs.List>
-          <Tabs.Trigger value="scope">Scope</Tabs.Trigger>
-          <Tabs.Trigger value="members">Members</Tabs.Trigger>
-          <Tabs.Trigger value="tools">Tools</Tabs.Trigger>
+          {SECTIONS.map(({ value, label }) => (
+            <Tabs.Trigger key={value} value={value}>
+              {label}
+            </Tabs.Trigger>
+          ))}
         </Tabs.List>
         <Tabs.Panel value="scope">
           <ScopeEditor projectId={projectId} />

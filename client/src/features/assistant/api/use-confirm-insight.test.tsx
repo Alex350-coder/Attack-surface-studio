@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useConfirmInsight } from "./use-confirm-insight";
 import { apiRequest } from "@/lib/api-client";
+import { queryClientWrapper } from "@/lib/test/query-client-wrapper";
 
 vi.mock("@/lib/api-client", () => ({ apiRequest: vi.fn() }));
 
@@ -42,20 +42,13 @@ const INSIGHT_RESULT = {
   ],
 };
 
-function wrapper() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
-}
-
 describe("useConfirmInsight", () => {
   afterEach(() => vi.clearAllMocks());
 
   it("posts the insight content and related node ids, Zod-parsing the written node and edges", async () => {
     vi.mocked(apiRequest).mockResolvedValue(INSIGHT_RESULT);
 
-    const { result } = renderHook(() => useConfirmInsight(PROJECT_ID), { wrapper: wrapper() });
+    const { result } = renderHook(() => useConfirmInsight(PROJECT_ID), { wrapper: queryClientWrapper() });
 
     result.current.mutate({ content: "example.com has not been scanned recently", relatedNodeIds: [NODE_ID] });
 
