@@ -53,7 +53,6 @@ describe("OrchestratorService", () => {
     projectsRepository = {
       create: vi.fn(),
       createWithOwner: vi.fn(),
-      updateScope: vi.fn(),
       update: vi.fn(),
       findById: vi.fn(),
       findBySlug: vi.fn(),
