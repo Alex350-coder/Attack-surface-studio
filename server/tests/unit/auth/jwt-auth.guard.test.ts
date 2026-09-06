@@ -40,6 +40,30 @@ describe("JwtAuthGuard", () => {
     await expect(guard.canActivate(makeContext(`Bearer ${token}`))).rejects.toThrow(UnauthorizedError);
   });
 
+  it("rejects a token signed with the wrong secret (forged token)", async () => {
+    const forgedToken = await jwtService.signAsync(
+      { sub: "attacker", email: "attacker@example.com" },
+      { secret: "b".repeat(32), expiresIn: "5m" },
+    );
+    await expect(guard.canActivate(makeContext(`Bearer ${forgedToken}`))).rejects.toThrow(UnauthorizedError);
+  });
+
+  it("rejects a token whose payload was tampered with after signing", async () => {
+    const token = await jwtService.signAsync({ sub: "u1", email: "a@example.com" }, { secret: SECRET, expiresIn: "5m" });
+    const [header, , signature] = token.split(".");
+    const tamperedPayload = Buffer.from(JSON.stringify({ sub: "attacker", email: "attacker@example.com" })).toString(
+      "base64url",
+    );
+    const tamperedToken = `${header}.${tamperedPayload}.${signature}`;
+    await expect(guard.canActivate(makeContext(`Bearer ${tamperedToken}`))).rejects.toThrow(UnauthorizedError);
+  });
+
+  it("rejects a structurally malformed token (not three dot-separated segments)", async () => {
+    await expect(guard.canActivate(makeContext("Bearer not.a.valid.jwt.structure"))).rejects.toThrow(
+      UnauthorizedError,
+    );
+  });
+
   it("accepts a valid access token and populates request.user", async () => {
     const token = await jwtService.signAsync({ sub: "u1", email: "a@example.com" }, { secret: SECRET, expiresIn: "5m" });
     const context = makeContext(`Bearer ${token}`);

@@ -80,4 +80,16 @@ describe("ProjectsRepository", () => {
     expect(result.items.map((item) => item.id)).toEqual([projectA.id]);
     expect(result.total).toBe(1);
   });
+
+  it("stores and returns a SQL-injection-shaped name as inert data (Drizzle parameterization, OWA-001)", async () => {
+    const payload = "Robert'); DROP TABLE projects;--";
+
+    const created = await repo.create({ name: payload, slug: "injection-attempt" });
+
+    expect(created.name).toBe(payload);
+    // If the payload had executed as SQL instead of being bound as a parameter, this table
+    // wouldn't exist to query, or this row (and the earlier ones in this test file) would be gone.
+    expect(await repo.findById(created.id)).toMatchObject({ name: payload });
+    expect(await repo.findBySlug("injection-attempt")).toMatchObject({ id: created.id });
+  });
 });

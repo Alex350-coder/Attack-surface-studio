@@ -1,10 +1,28 @@
 import { z } from "zod";
 
 /**
+ * SEC-017 hardening: `NVIDIA_API_BASE_URL` is fed directly into the OpenAI-compatible client's
+ * `baseURL` (nvidia-llm.provider.ts). An operator-controlled env var is low risk, but an
+ * unrestricted `z.string().url()` would let a compromised or misconfigured deployment point the
+ * AI Assistant's API key and every prompt/response at an arbitrary host (SSRF/exfiltration).
+ * Restrict it to NVIDIA's own domain.
+ */
+const NVIDIA_API_BASE_URL_ALLOWED_HOST_SUFFIX = ".nvidia.com";
+
+function isAllowedNvidiaApiBaseUrl(value: string): boolean {
+  try {
+    const { hostname } = new URL(value);
+    return hostname === "nvidia.com" || hostname.endsWith(NVIDIA_API_BASE_URL_ALLOWED_HOST_SUFFIX);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Fail-fast startup contract (BE-022, SEC-017): the process must refuse to boot rather than run
  * with an invalid or missing configuration value.
  */
-export const envSchema = z.object({
+const baseEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
@@ -47,6 +65,21 @@ export const envSchema = z.object({
   // assistant.module.ts and .env.example.
   NVIDIA_MODEL_ID: z.string().min(1).default("meta/llama-3.3-70b-instruct"),
   NVIDIA_API_BASE_URL: z.string().url().default("https://integrate.api.nvidia.com/v1"),
+});
+
+/**
+ * The host allow-list only applies once the assistant feature is actually configured
+ * (`NVIDIA_API_KEY` set) -- preserving the "optional feature still boots gracefully" contract
+ * for the common case where the whole feature is unset (see NVIDIA_API_KEY's comment above).
+ */
+export const envSchema = baseEnvSchema.superRefine((config, ctx) => {
+  if (config.NVIDIA_API_KEY && !isAllowedNvidiaApiBaseUrl(config.NVIDIA_API_BASE_URL)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["NVIDIA_API_BASE_URL"],
+      message: `NVIDIA_API_BASE_URL must be a *${NVIDIA_API_BASE_URL_ALLOWED_HOST_SUFFIX} host when NVIDIA_API_KEY is set`,
+    });
+  }
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

@@ -46,4 +46,38 @@ describe("LocalFilesystemBlobStorage", () => {
     await expect(storage.get("../../etc/passwd")).rejects.toThrow(/Invalid blob ref/);
     await expect(storage.get("sha256/../../secret")).rejects.toThrow(/Invalid blob ref/);
   });
+
+  describe("path traversal adversarial verification (SEC-051, OWA-005)", () => {
+    const validHash = "a".repeat(64);
+    const VALID_REF = `sha256/${validHash.slice(0, 2)}/${validHash.slice(2, 4)}/${validHash}`;
+
+    it("rejects an absolute path ref", async () => {
+      await expect(storage.get("/etc/passwd")).rejects.toThrow(/Invalid blob ref/);
+    });
+
+    it("rejects a Windows-style absolute path ref", async () => {
+      await expect(storage.get("C:\\Windows\\System32\\config\\SAM")).rejects.toThrow(/Invalid blob ref/);
+    });
+
+    it("rejects traversal embedded inside an otherwise well-formed-looking ref", async () => {
+      await expect(storage.get(`sha256/${validHash.slice(0, 2)}/../../../../etc/passwd`)).rejects.toThrow(
+        /Invalid blob ref/,
+      );
+    });
+
+    it("rejects a ref with a null byte", async () => {
+      await expect(storage.get(`${VALID_REF}\0.txt`)).rejects.toThrow(/Invalid blob ref/);
+    });
+
+    it("rejects a ref that is too short/long to be a real sha256 hash", async () => {
+      await expect(storage.get("sha256/aa/bb/deadbeef")).rejects.toThrow(/Invalid blob ref/);
+    });
+
+    it("resolves a well-formed ref within the storage root, never escaping it", async () => {
+      // A structurally valid but never-written ref must still resolve inside `root` and simply
+      // 404 at the filesystem level (ENOENT) -- proving the guard's job is traversal prevention,
+      // not existence-checking, and that it doesn't accidentally widen the resolved path.
+      await expect(storage.get(VALID_REF)).rejects.toMatchObject({ code: "ENOENT" });
+    });
+  });
 });

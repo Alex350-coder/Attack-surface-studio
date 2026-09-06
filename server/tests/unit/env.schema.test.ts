@@ -41,4 +41,36 @@ describe("validateEnv", () => {
   it("fails fast when NODE_ENV is not one of the known values", () => {
     expect(() => validateEnv({ ...REQUIRED_VARS, NODE_ENV: "staging" })).toThrow();
   });
+
+  describe("NVIDIA_API_BASE_URL allow-list (SEC-017)", () => {
+    it("accepts the default URL when NVIDIA_API_KEY is set", () => {
+      const config = validateEnv({ ...REQUIRED_VARS, NVIDIA_API_KEY: "test-key" });
+      expect(config.NVIDIA_API_BASE_URL).toBe("https://integrate.api.nvidia.com/v1");
+    });
+
+    it("rejects an off-allow-list host when NVIDIA_API_KEY is set", () => {
+      expect(() =>
+        validateEnv({
+          ...REQUIRED_VARS,
+          NVIDIA_API_KEY: "test-key",
+          NVIDIA_API_BASE_URL: "https://evil.example.com/v1",
+        }),
+      ).toThrow(/NVIDIA_API_BASE_URL/);
+    });
+
+    it("stays valid with an off-allow-list host when NVIDIA_API_KEY is unset", () => {
+      const config = validateEnv({ ...REQUIRED_VARS, NVIDIA_API_BASE_URL: "https://evil.example.com/v1" });
+      expect(config.NVIDIA_API_BASE_URL).toBe("https://evil.example.com/v1");
+      expect(config.NVIDIA_API_KEY).toBeUndefined();
+    });
+
+    it("accepts any subdomain of nvidia.com when NVIDIA_API_KEY is set", () => {
+      const config = validateEnv({
+        ...REQUIRED_VARS,
+        NVIDIA_API_KEY: "test-key",
+        NVIDIA_API_BASE_URL: "https://build.nvidia.com/v1",
+      });
+      expect(config.NVIDIA_API_BASE_URL).toBe("https://build.nvidia.com/v1");
+    });
+  });
 });

@@ -44,7 +44,13 @@ function dataOf<T>(response: request.Response): T {
   return (response.body as { data: T }).data;
 }
 
-const PNG_SIGNATURE = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64)]);
+// A real, structurally valid 1x1 PNG (signature + minimal IHDR/IDAT/IEND chunks). `file-type`
+// v21+ validates the IHDR chunk rather than trusting the bare 8-byte signature, so a
+// signature-plus-zero-padding fixture (sufficient pre-upgrade) no longer sniffs as `image/png`.
+const PNG_SIGNATURE = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
 const EXE_SIGNATURE = Buffer.concat([Buffer.from([0x4d, 0x5a]), Buffer.alloc(64)]);
 
 describe("Evidence upload and notes (POST /api/v1/projects/:id/evidence, /notes)", () => {

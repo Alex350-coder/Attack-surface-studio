@@ -1,0 +1,50 @@
+name: Security Audit
+
+# SEC-022: automated dependency vulnerability scanning. Runs `pnpm audit`
+# against production dependencies for both workspaces on every push/PR so a
+# newly disclosed high/critical advisory fails CI instead of going unnoticed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  audit-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: server/pnpm-lock.yaml
+      - name: Install dependencies
+        working-directory: server
+        run: pnpm install --frozen-lockfile
+      - name: Audit production dependencies
+        working-directory: server
+        run: pnpm run security:audit
+
+  audit-client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: client/pnpm-lock.yaml
+      - name: Install dependencies
+        working-directory: client
+        run: pnpm install --frozen-lockfile
+      - name: Audit production dependencies
+        working-directory: client
+        run: pnpm run security:audit
