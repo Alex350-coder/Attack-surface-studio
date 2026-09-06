@@ -15,7 +15,8 @@
     "start:worker:dev": "nest start --watch --entryFile worker-main",
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.ts\"",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "security:audit": "pnpm audit --prod --audit-level=high"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",
