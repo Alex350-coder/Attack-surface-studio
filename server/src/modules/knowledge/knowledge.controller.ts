@@ -12,8 +12,8 @@ import {
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { fromBuffer } from "file-type";
 import type { Request, Response } from "express";
+import { sniffMimeType } from "../../core/storage/sniff-mime-type";
 import { UnauthorizedError, ValidationError } from "../../core/http/domain-error";
 import { ZodValidationPipe } from "../../core/validation/zod-validation.pipe";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -90,8 +90,7 @@ export class KnowledgeController {
       throw new ValidationError("An evidence file is required (multipart field 'file')");
     }
 
-    const detected = await fromBuffer(file.buffer).catch(() => undefined);
-    const sniffedMimeType = detected?.mime;
+    const sniffedMimeType = await sniffMimeType(file.buffer);
     if (!sniffedMimeType || !(ALLOWED_EVIDENCE_MIME_TYPES as readonly string[]).includes(sniffedMimeType)) {
       throw new ValidationError(
         "Unsupported evidence file type -- content does not match an allowed image or PDF signature",
