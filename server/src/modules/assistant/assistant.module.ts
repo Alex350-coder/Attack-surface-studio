@@ -32,7 +32,7 @@ import { PromptBuilderService } from "./prompt-builder.service";
         }
         return new NvidiaLlmProvider({
           apiKey,
-          modelId: config.get("NVIDIA_MODEL_ID", { infer: true }) ?? "meta/llama-3.3-70b-instruct",
+          modelId: config.get("NVIDIA_MODEL_ID", { infer: true }),
           baseUrl: config.get("NVIDIA_API_BASE_URL", { infer: true }),
         });
       },

@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, jsonb, boolean, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, jsonb, boolean, timestamp, unique, index } from "drizzle-orm/pg-core";
 import { projects } from "./projects";
 import { nodes } from "./nodes";
 import { toolRuns } from "./toolRuns";
@@ -31,5 +31,11 @@ export const edges = pgTable(
       table.targetId,
       table.type,
     ),
+    // The unique constraint above covers (projectId, sourceId, ...) lookups, but every reverse
+    // traversal -- "what points at this node" (graph-traversal.repository.ts's inbound recursive
+    // branch, getCriticalFindingsForAsset) -- filters by targetId, which isn't a leftmost column
+    // in any existing index. Without this, those queries force a sequential scan on a table that
+    // grows without bound as tool runs accumulate (PERF-004 forbids that).
+    index("edges_project_target_idx").on(table.projectId, table.targetId),
   ],
 );

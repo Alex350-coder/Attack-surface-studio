@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { X } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -38,14 +38,26 @@ export function ScopeEditor({ projectId }: Props) {
   const projectQuery = useProject(projectId);
   const updateProject = useUpdateProject(projectId);
 
-  const [includes, setIncludes] = useState<string[]>([]);
-  const [excludes, setExcludes] = useState<string[]>([]);
-
-  useEffect(() => {
-    const scope = scopeShapeSchema.parse(projectQuery.data?.scope);
+  // `includes`/`excludes` are locally editable copies of the server scope (add/remove entries
+  // mutate them optimistically before saving), so they can't be derived with useMemo. Seed them
+  // from whatever scope is already available at mount, then re-seed whenever a *new* server
+  // payload arrives by adjusting state directly during render (the React-recommended alternative
+  // to a useEffect+setState sync, see
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes),
+  // which avoids the extra render pass an effect-based sync would trigger.
+  const [includes, setIncludes] = useState<string[]>(
+    () => scopeShapeSchema.parse(projectQuery.data?.scope).includes,
+  );
+  const [excludes, setExcludes] = useState<string[]>(
+    () => scopeShapeSchema.parse(projectQuery.data?.scope).excludes,
+  );
+  const [loadedScope, setLoadedScope] = useState(projectQuery.data?.scope);
+  if (projectQuery.data && projectQuery.data.scope !== loadedScope) {
+    const scope = scopeShapeSchema.parse(projectQuery.data.scope);
+    setLoadedScope(projectQuery.data.scope);
     setIncludes(scope.includes);
     setExcludes(scope.excludes);
-  }, [projectQuery.data]);
+  }
 
   if (projectQuery.isLoading) {
     return <p className="text-sm text-[var(--color-foreground-muted)]">Loading scope…</p>;

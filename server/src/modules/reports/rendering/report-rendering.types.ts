@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { nodeCategorySchema, nodeFindingSchema, nodeTypeSchema, severitySchema } from "../../../contracts/node.schema";
 import { edgeTypeSchema } from "../../../contracts/edge.schema";
+import type { ReportExportFormat } from "../../../contracts/report-export.schema";
+
+export type { ReportExportFormat };
 
 /**
  * Minimal, rendering-relevant projection of a graph node -- everything a renderer might
@@ -38,8 +41,6 @@ export const reportGraphSnapshotSchema = z.object({
   edges: z.array(reportSnapshotEdgeSchema),
 });
 export type ReportGraphSnapshot = z.infer<typeof reportGraphSnapshotSchema>;
-
-export type ReportExportFormat = "pdf" | "html" | "markdown";
 
 export interface RenderedReport {
   buffer: Buffer;

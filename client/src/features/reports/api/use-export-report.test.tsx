@@ -1,20 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useExportReport } from "./use-export-report";
 import { apiRequestBlob } from "@/lib/api-client";
+import { queryClientWrapper } from "@/lib/test/query-client-wrapper";
 
 vi.mock("@/lib/api-client", () => ({ apiRequestBlob: vi.fn() }));
 
 const PROJECT_ID = "11111111-1111-1111-1111-111111111111";
 const REPORT_ID = "22222222-2222-2222-2222-222222222222";
-
-function wrapper() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
-}
 
 describe("useExportReport", () => {
   afterEach(() => {
@@ -29,7 +22,7 @@ describe("useExportReport", () => {
     vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL });
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
 
-    const { result } = renderHook(() => useExportReport(PROJECT_ID), { wrapper: wrapper() });
+    const { result } = renderHook(() => useExportReport(PROJECT_ID), { wrapper: queryClientWrapper() });
 
     result.current.mutate({ reportId: REPORT_ID, format: "pdf" });
 
@@ -46,7 +39,7 @@ describe("useExportReport", () => {
   it("surfaces a failed export as a mutation error", async () => {
     vi.mocked(apiRequestBlob).mockRejectedValue(new Error("export failed"));
 
-    const { result } = renderHook(() => useExportReport(PROJECT_ID), { wrapper: wrapper() });
+    const { result } = renderHook(() => useExportReport(PROJECT_ID), { wrapper: queryClientWrapper() });
 
     result.current.mutate({ reportId: REPORT_ID, format: "html" });
 

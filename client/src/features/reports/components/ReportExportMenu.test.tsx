@@ -26,7 +26,7 @@ describe("ReportExportMenu", () => {
 
   it("triggers export with the selected format on click", () => {
     const mutate = vi.fn();
-    vi.mocked(useExportReport).mockReturnValue({ mutate, isPending: false, isError: false } as never);
+    vi.mocked(useExportReport).mockReturnValue({ mutate, isPending: false, isError: false, reset: vi.fn() } as never);
     renderMenu();
 
     fireEvent.change(screen.getByLabelText("Export format"), { target: { value: "markdown" } });
@@ -36,16 +36,26 @@ describe("ReportExportMenu", () => {
   });
 
   it("disables the button and shows pending text while exporting", () => {
-    vi.mocked(useExportReport).mockReturnValue({ mutate: vi.fn(), isPending: true, isError: false } as never);
+    vi.mocked(useExportReport).mockReturnValue({ mutate: vi.fn(), isPending: true, isError: false, reset: vi.fn() } as never);
     renderMenu();
 
     expect(screen.getByRole("button", { name: "Exporting…" })).toBeDisabled();
   });
 
   it("shows an error message when the export fails", () => {
-    vi.mocked(useExportReport).mockReturnValue({ mutate: vi.fn(), isPending: false, isError: true } as never);
+    vi.mocked(useExportReport).mockReturnValue({ mutate: vi.fn(), isPending: false, isError: true, reset: vi.fn() } as never);
     renderMenu();
 
     expect(screen.getByRole("alert")).toHaveTextContent("Export failed.");
+  });
+
+  it("clears a stale error when the format is changed before retrying", () => {
+    const reset = vi.fn();
+    vi.mocked(useExportReport).mockReturnValue({ mutate: vi.fn(), isPending: false, isError: true, reset } as never);
+    renderMenu();
+
+    fireEvent.change(screen.getByLabelText("Export format"), { target: { value: "html" } });
+
+    expect(reset).toHaveBeenCalledOnce();
   });
 });

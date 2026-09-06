@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
 import { ScopeEditor } from "./ScopeEditor";
 import { useProject } from "@/features/workspace/api/use-project";
 import type { Project } from "@/features/workspace/api/use-projects";

@@ -43,7 +43,6 @@ export interface ProjectsRepository {
    * `create()` remains for seeds/fixtures that manage membership separately.
    */
   createWithOwner(input: ProjectCreateInput & { createdBy: string }): Promise<ProjectRow>;
-  updateScope(id: string, scope: ProjectScope): Promise<ProjectRow | null>;
   /** Updates whichever of `name`/`scope` are provided in a single write — used by `PATCH /projects/:id`. */
   update(id: string, patch: { name?: string; scope?: ProjectScope }): Promise<ProjectRow | null>;
   findById(id: string): Promise<ProjectRow | null>;
@@ -111,16 +110,6 @@ export class DrizzleProjectsRepository implements ProjectsRepository {
       updatedAt: row.updated_at,
       deletedAt: row.deleted_at,
     };
-  }
-
-  async updateScope(id: string, scope: ProjectScope): Promise<ProjectRow | null> {
-    const validScope = projectScopeSchema.parse(scope);
-    const [row] = await this.db
-      .update(projects)
-      .set({ scope: validScope, updatedAt: sql`now()` })
-      .where(and(eq(projects.id, id), isNull(projects.deletedAt)))
-      .returning();
-    return (row as ProjectRow) ?? null;
   }
 
   async update(id: string, patch: { name?: string; scope?: ProjectScope }): Promise<ProjectRow | null> {

@@ -42,7 +42,10 @@ export const envSchema = z.object({
   // existing suite that boots AppModule keeps booting without these. See SECURITY_MODEL.md
   // "AI Assistant security" for why this is a documented deviation from fail-fast-required.
   NVIDIA_API_KEY: z.string().min(1).optional(),
-  NVIDIA_MODEL_ID: z.string().min(1).optional(),
+  // Defaulted here (not with a `??` fallback at the call site) so the one canonical default lives
+  // in the schema, same as NVIDIA_API_BASE_URL below -- was previously duplicated between
+  // assistant.module.ts and .env.example.
+  NVIDIA_MODEL_ID: z.string().min(1).default("meta/llama-3.3-70b-instruct"),
   NVIDIA_API_BASE_URL: z.string().url().default("https://integrate.api.nvidia.com/v1"),
 });
 

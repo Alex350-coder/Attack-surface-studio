@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "edges_project_target_idx" ON "edges" USING btree ("project_id","target_id");

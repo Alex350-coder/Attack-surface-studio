@@ -15,3 +15,14 @@ export function canAssignRole(
   if (desiredRole === "owner" && actorRole !== "owner") return false;
   return true;
 }
+
+/**
+ * Same allow-list as {@link canAssignRole}, specialized for removal: only an `owner` may remove
+ * another `owner`; `admin` may remove `member`/`viewer` (SEC-015: no privilege escalation via
+ * removing-then-re-adding as a workaround).
+ */
+export function canRemoveMember(actorRole: ProjectRole, targetCurrentRole: ProjectRole): boolean {
+  if (actorRole !== "owner" && actorRole !== "admin") return false;
+  if (targetCurrentRole === "owner" && actorRole !== "owner") return false;
+  return true;
+}

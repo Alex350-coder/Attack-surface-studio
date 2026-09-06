@@ -45,9 +45,8 @@ describe("ProjectsRepository", () => {
 
   it("updates scope after validating it", async () => {
     const created = await repo.create({ name: "Scoped", slug: "scoped" });
-    const updated = await repo.updateScope(created.id, {
-      includes: ["example.com"],
-      excludes: ["staging.example.com"],
+    const updated = await repo.update(created.id, {
+      scope: { includes: ["example.com"], excludes: ["staging.example.com"] },
     });
 
     expect(updated?.scope).toEqual({ includes: ["example.com"], excludes: ["staging.example.com"] });

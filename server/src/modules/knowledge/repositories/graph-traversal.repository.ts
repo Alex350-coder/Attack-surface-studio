@@ -69,17 +69,22 @@ export class DrizzleGraphTraversalRepository implements GraphTraversalRepository
       return result.rows as unknown as NodeRow[];
     }
 
+    // A recursive CTE may only self-reference its own name once (SQL standard, enforced by
+    // Postgres); the previous version joined `reachable` twice (once per edge direction), which
+    // is a syntax error Postgres rejects at execution time -- this path was never actually
+    // exercised until this phase's EXPLAIN-verification pass caught it. Expressed instead as a
+    // single self-join matching either direction, picking whichever endpoint isn't `r.id`.
     const result = await this.db.execute<Record<string, unknown>>(sql`
       WITH RECURSIVE reachable AS (
         SELECT n.id, 0 AS depth FROM nodes n
         WHERE n.id = ${focusNodeId} AND n.project_id = ${projectId} AND n.deleted_at IS NULL
         UNION ALL
-        SELECT e.target_id, r.depth + 1 FROM reachable r
-        JOIN edges e ON e.source_id = r.id AND e.project_id = ${projectId} AND e.deleted_at IS NULL
-        WHERE r.depth < ${depth}
-        UNION ALL
-        SELECT e.source_id, r.depth + 1 FROM reachable r
-        JOIN edges e ON e.target_id = r.id AND e.project_id = ${projectId} AND e.deleted_at IS NULL
+        SELECT
+          CASE WHEN e.source_id = r.id THEN e.target_id ELSE e.source_id END,
+          r.depth + 1
+        FROM reachable r
+        JOIN edges e ON (e.source_id = r.id OR e.target_id = r.id)
+          AND e.project_id = ${projectId} AND e.deleted_at IS NULL
         WHERE r.depth < ${depth}
       )
       SELECT DISTINCT ${NODE_COLUMNS} FROM nodes n

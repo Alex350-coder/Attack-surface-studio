@@ -64,7 +64,6 @@ describe("ProjectsService", () => {
     projectsRepository = {
       create: vi.fn(),
       createWithOwner: vi.fn(),
-      updateScope: vi.fn(),
       update: vi.fn(),
       findById: vi.fn(),
       findBySlug: vi.fn(),
@@ -116,6 +115,7 @@ describe("ProjectsService", () => {
       await expect(
         service.createProject(OWNER_ID, { name: "Test Project", slug: "test-project" }),
       ).rejects.toBeInstanceOf(ConflictError);
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.fn() mock, not a bound class method
       expect(projectsRepository.createWithOwner).not.toHaveBeenCalled();
     });
 
@@ -125,6 +125,7 @@ describe("ProjectsService", () => {
 
       const result = await service.createProject(OWNER_ID, { name: "Test Project", slug: "test-project" });
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.fn() mock, not a bound class method
       expect(projectsRepository.createWithOwner).toHaveBeenCalledWith(
         expect.objectContaining({ name: "Test Project", slug: "test-project", createdBy: OWNER_ID }),
       );
@@ -159,8 +160,8 @@ describe("ProjectsService", () => {
     });
 
     it("rejects a non-owner assigning the owner role", async () => {
-      projectMembersRepository.findByProjectAndUser.mockImplementation(async (_projectId, userId) =>
-        userId === OWNER_ID ? makeMembership({ userId: OWNER_ID, role: "admin" }) : null,
+      projectMembersRepository.findByProjectAndUser.mockImplementation((_projectId, userId) =>
+        Promise.resolve(userId === OWNER_ID ? makeMembership({ userId: OWNER_ID, role: "admin" }) : null),
       );
       usersRepository.findByEmail.mockResolvedValue(makeUser());
 
@@ -170,8 +171,8 @@ describe("ProjectsService", () => {
     });
 
     it("adds a new member when the assignment is permitted", async () => {
-      projectMembersRepository.findByProjectAndUser.mockImplementation(async (_projectId, userId) =>
-        userId === OWNER_ID ? makeMembership({ userId: OWNER_ID, role: "owner" }) : null,
+      projectMembersRepository.findByProjectAndUser.mockImplementation((_projectId, userId) =>
+        Promise.resolve(userId === OWNER_ID ? makeMembership({ userId: OWNER_ID, role: "owner" }) : null),
       );
       usersRepository.findByEmail.mockResolvedValue(makeUser());
       projectMembersRepository.addMember.mockResolvedValue(
@@ -183,12 +184,70 @@ describe("ProjectsService", () => {
         role: "member",
       });
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.fn() mock, not a bound class method
       expect(projectMembersRepository.addMember).toHaveBeenCalledWith({
         projectId: PROJECT_ID,
         userId: OTHER_USER_ID,
         role: "member",
       });
       expect(result.userId).toBe(OTHER_USER_ID);
+    });
+  });
+
+  describe("removeMember", () => {
+    it("rejects when the acting user is not a project member", async () => {
+      projectMembersRepository.findByProjectAndUser.mockResolvedValue(null);
+
+      await expect(
+        service.removeMember(OWNER_ID, PROJECT_ID, OTHER_USER_ID),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+    });
+
+    it("rejects self-removal", async () => {
+      projectMembersRepository.findByProjectAndUser.mockResolvedValue(makeMembership({ userId: OWNER_ID }));
+
+      await expect(
+        service.removeMember(OWNER_ID, PROJECT_ID, OWNER_ID),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+    });
+
+    it("throws NotFoundError when the target is not a member", async () => {
+      projectMembersRepository.findByProjectAndUser.mockImplementation((_projectId, userId) =>
+        Promise.resolve(userId === OWNER_ID ? makeMembership({ userId: OWNER_ID, role: "owner" }) : null),
+      );
+
+      await expect(
+        service.removeMember(OWNER_ID, PROJECT_ID, OTHER_USER_ID),
+      ).rejects.toBeInstanceOf(NotFoundError);
+    });
+
+    it("rejects a non-owner removing an owner", async () => {
+      projectMembersRepository.findByProjectAndUser.mockImplementation((_projectId, userId) =>
+        Promise.resolve(
+          userId === OWNER_ID
+            ? makeMembership({ userId: OWNER_ID, role: "admin" })
+            : makeMembership({ id: "member-2", userId: OTHER_USER_ID, role: "owner" }),
+        ),
+      );
+
+      await expect(
+        service.removeMember(OWNER_ID, PROJECT_ID, OTHER_USER_ID),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+    });
+
+    it("removes a member when the removal is permitted", async () => {
+      projectMembersRepository.findByProjectAndUser.mockImplementation((_projectId, userId) =>
+        Promise.resolve(
+          userId === OWNER_ID
+            ? makeMembership({ userId: OWNER_ID, role: "owner" })
+            : makeMembership({ id: "member-2", userId: OTHER_USER_ID, role: "member" }),
+        ),
+      );
+
+      await service.removeMember(OWNER_ID, PROJECT_ID, OTHER_USER_ID);
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- vi.fn() mock, not a bound class method
+      expect(projectMembersRepository.removeMember).toHaveBeenCalledWith(PROJECT_ID, OTHER_USER_ID);
     });
   });
 
@@ -212,7 +271,7 @@ describe("ProjectsService", () => {
         updatedAt: new Date(),
         lastSeenAt: new Date(),
         deletedAt: null,
-      } as NodeRow;
+      };
       const edge: EdgeRow = {
         id: edgeId,
         projectId: PROJECT_ID,
