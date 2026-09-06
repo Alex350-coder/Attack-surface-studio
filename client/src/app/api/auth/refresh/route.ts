@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { backendRequest } from "@/lib/backend-client";
 import { REFRESH_TOKEN_COOKIE, clearRefreshTokenCookie, setRefreshTokenCookie } from "@/lib/auth-cookies";
+import { assertTrustedOrigin } from "@/lib/csrf";
 
 interface TokenPairBody {
   accessToken: string;
@@ -14,6 +15,11 @@ interface TokenPairBody {
  * the token was invalid or already used.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const csrfRejection = assertTrustedOrigin(request);
+  if (csrfRejection) {
+    return csrfRejection;
+  }
+
   const refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value;
   if (!refreshToken) {
     return NextResponse.json(

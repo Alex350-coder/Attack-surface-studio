@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { backendRequest } from "@/lib/backend-client";
 import { REFRESH_TOKEN_COOKIE, clearRefreshTokenCookie } from "@/lib/auth-cookies";
+import { assertTrustedOrigin } from "@/lib/csrf";
 
 /**
  * BFF logout endpoint. Invalidates the refresh token server-side (SEC-005) before clearing the
@@ -12,6 +13,11 @@ import { REFRESH_TOKEN_COOKIE, clearRefreshTokenCookie } from "@/lib/auth-cookie
  * access token is available to authorize it.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const csrfRejection = assertTrustedOrigin(request);
+  if (csrfRejection) {
+    return csrfRejection;
+  }
+
   const refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value;
   const authorization = request.headers.get("authorization") ?? undefined;
 
