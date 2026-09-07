@@ -103,7 +103,9 @@ export class ProjectsService {
     if (!result) {
       throw new NotFoundError("Project membership not found");
     }
-    return toProjectMemberDto(result);
+    // addMember/updateRole only touch project_members, so they can't return the joined user
+    // fields listMembers does -- attach them from targetUser, already fetched above (BUG #5).
+    return toProjectMemberDto({ ...result, email: targetUser.email, displayName: targetUser.displayName });
   }
 
   async removeMember(actingUserId: string, projectId: string, targetUserId: string): Promise<void> {

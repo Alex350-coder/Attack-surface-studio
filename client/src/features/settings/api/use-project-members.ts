@@ -9,6 +9,8 @@ export const projectMemberSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
   userId: z.string().uuid(),
+  email: z.string().email(),
+  displayName: z.string().nullable(),
   role: z.enum(["owner", "admin", "member", "viewer"]),
   createdAt: z.coerce.date(),
 });

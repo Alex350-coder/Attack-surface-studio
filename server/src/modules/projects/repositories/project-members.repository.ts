@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { Database } from "../../../core/database/client";
 import { isUniqueViolation } from "../../../core/database/pg-error";
-import { projectMembers } from "../../../core/database/schema";
+import { projectMembers, users } from "../../../core/database/schema";
 import { ConflictError } from "../../../core/http/domain-error";
 import {
   extractTotal,
@@ -21,6 +21,17 @@ export interface ProjectMemberRow {
   createdAt: Date;
 }
 
+/**
+ * A member row joined with the identifying fields off `users` -- everything the UI needs to show
+ * *who* a member actually is instead of a bare `userId` (BUG #5). `addMember`/`updateRole` don't
+ * join (their `.returning()` only covers `project_members`); callers that already have the target
+ * `UserRow` in hand (e.g. `addOrAssignMember`, which looked it up by email) attach it themselves.
+ */
+export interface ProjectMemberWithUserRow extends ProjectMemberRow {
+  email: string;
+  displayName: string | null;
+}
+
 export interface ProjectMemberCreateInput {
   projectId: string;
   userId: string;
@@ -34,7 +45,7 @@ export interface ProjectMemberCreateInput {
 export interface ProjectMembersRepository {
   addMember(input: ProjectMemberCreateInput): Promise<ProjectMemberRow>;
   findByProjectAndUser(projectId: string, userId: string): Promise<ProjectMemberRow | null>;
-  listByProject(projectId: string, pagination?: PaginationParams): Promise<Paginated<ProjectMemberRow>>;
+  listByProject(projectId: string, pagination?: PaginationParams): Promise<Paginated<ProjectMemberWithUserRow>>;
   updateRole(projectId: string, userId: string, role: ProjectRole): Promise<ProjectMemberRow | null>;
   removeMember(projectId: string, userId: string): Promise<void>;
 }
@@ -66,16 +77,30 @@ export class DrizzleProjectMembersRepository implements ProjectMembersRepository
     return (row as ProjectMemberRow) ?? null;
   }
 
-  async listByProject(projectId: string, pagination?: PaginationParams): Promise<Paginated<ProjectMemberRow>> {
+  async listByProject(projectId: string, pagination?: PaginationParams): Promise<Paginated<ProjectMemberWithUserRow>> {
     const { page, pageSize, offset } = normalizePagination(pagination);
     const where = eq(projectMembers.projectId, projectId);
 
-    const [items, countRows] = await Promise.all([
-      this.db.select().from(projectMembers).where(where).limit(pageSize).offset(offset),
+    const [rows, countRows] = await Promise.all([
+      this.db
+        .select({
+          id: projectMembers.id,
+          projectId: projectMembers.projectId,
+          userId: projectMembers.userId,
+          role: projectMembers.role,
+          createdAt: projectMembers.createdAt,
+          email: users.email,
+          displayName: users.displayName,
+        })
+        .from(projectMembers)
+        .innerJoin(users, eq(projectMembers.userId, users.id))
+        .where(where)
+        .limit(pageSize)
+        .offset(offset),
       this.db.select({ count: sql<number>`count(*)::int` }).from(projectMembers).where(where),
     ]);
 
-    return { items: items as ProjectMemberRow[], page, pageSize, total: extractTotal(countRows) };
+    return { items: rows as ProjectMemberWithUserRow[], page, pageSize, total: extractTotal(countRows) };
   }
 
   async updateRole(projectId: string, userId: string, role: ProjectRole): Promise<ProjectMemberRow | null> {

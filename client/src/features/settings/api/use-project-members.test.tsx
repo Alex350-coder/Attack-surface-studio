@@ -11,6 +11,8 @@ const MEMBER = {
   id: "22222222-2222-2222-2222-222222222222",
   projectId: PROJECT_ID,
   userId: "33333333-3333-3333-3333-333333333333",
+  email: "member@example.com",
+  displayName: null,
   role: "admin",
   createdAt: new Date().toISOString(),
 };
