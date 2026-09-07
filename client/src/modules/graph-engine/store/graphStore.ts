@@ -80,8 +80,24 @@ export function createGraphStore() {
     rootNodeId: null,
     visibleNodeIds: new Set(),
     visibleEdgeIds: new Set(),
+    // Interactive consumers (no timeline script, e.g. the Workspace graph and the Report
+    // builder's node picker) reveal everything up front -- `useGraphTimeline` flips `status` to
+    // 'interactive' synchronously on mount before this ever runs (child effects fire before the
+    // parent `GraphProvider` effect that calls this), so gating on `status` here means real graph
+    // data actually renders instead of staying hidden behind an empty visibility set that nothing
+    // else would ever repopulate (BUG #3). A scripted Hero timeline is still mid-'playing' at this
+    // point and keeps its empty-then-progressively-revealed behavior untouched.
     setGraphData: (nodes, edges, rootNodeId) =>
-      set({ nodes, edges, rootNodeId: rootNodeId ?? null, visibleNodeIds: new Set(), visibleEdgeIds: new Set() }),
+      set((state) => {
+        const revealImmediately = state.status !== 'playing'
+        return {
+          nodes,
+          edges,
+          rootNodeId: rootNodeId ?? null,
+          visibleNodeIds: revealImmediately ? new Set(nodes.map((n) => n.id)) : new Set(),
+          visibleEdgeIds: revealImmediately ? new Set(edges.map((e) => e.id)) : new Set(),
+        }
+      }),
     revealNode: (nodeId) => set((state) => ({ visibleNodeIds: new Set(state.visibleNodeIds).add(nodeId) })),
     revealEdge: (edgeId) => set((state) => ({ visibleEdgeIds: new Set(state.visibleEdgeIds).add(edgeId) })),
     revealAll: () =>
