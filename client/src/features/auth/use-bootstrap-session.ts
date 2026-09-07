@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiRequest } from "@/lib/api-client";
-import type { ApiEnvelope } from "@/lib/api-envelope";
+import { apiRequest, refreshAccessToken } from "@/lib/api-client";
 import { useAuthStore, useIsAuthenticated, type AuthUser } from "./auth.store";
 
 /**
@@ -27,17 +26,15 @@ export function useBootstrapSession(): { isReady: boolean } {
 
     async function bootstrap(): Promise<void> {
       try {
-        const response = await fetch("/api/auth/refresh", { method: "POST", credentials: "include" });
-        const envelope = (await response.json()) as ApiEnvelope<{ accessToken: string }>;
-        if (!envelope.success) {
+        const accessToken = await refreshAccessToken();
+        if (!accessToken) {
           throw new Error("Session expired");
         }
 
-        useAuthStore.getState().setAccessToken(envelope.data.accessToken);
         const user = await apiRequest<AuthUser>("/auth/me");
         if (cancelled) return;
 
-        useAuthStore.getState().setSession({ accessToken: envelope.data.accessToken, user });
+        useAuthStore.getState().setSession({ accessToken, user });
         setBootstrapped(true);
       } catch {
         if (cancelled) return;
