@@ -68,6 +68,39 @@ describe("apiRequest", () => {
     expect(fetch).toHaveBeenCalledTimes(3);
   });
 
+  it("coalesces concurrent 401s into a single refresh call (BUG #1 regression)", async () => {
+    // Two requests expire at once (e.g. two parallel queries after the access token TTL elapses).
+    // Each hits a 401 independently; without de-duplication, both would call /api/auth/refresh
+    // with the same pre-rotation cookie, and the backend's single-use rotation would treat the
+    // second call as a replay -- revoking the whole session chain and logging the user out.
+    useAuthStore.getState().setSession({ accessToken: "stale-token", user: { id: "u1", email: "a@b.com", displayName: null } });
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = typeof input === "string" ? input : (input as Request).url;
+      if (url.includes("/api/auth/refresh")) {
+        return Promise.resolve(jsonResponse(200, { success: true, data: { accessToken: "fresh-token" } }));
+      }
+      if (url.includes("/projects/a") || url.includes("/projects/b")) {
+        const alreadyRefreshed = useAuthStore.getState().accessToken === "fresh-token";
+        return Promise.resolve(
+          alreadyRefreshed
+            ? jsonResponse(200, { success: true, data: { ok: true } })
+            : jsonResponse(401, { success: false, error: { message: "Unauthorized", code: "UNAUTHORIZED", correlationId: "c" } }),
+        );
+      }
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+
+    const [resultA, resultB] = await Promise.all([apiRequest("/projects/a"), apiRequest("/projects/b")]);
+
+    expect(resultA).toEqual({ ok: true });
+    expect(resultB).toEqual({ ok: true });
+    const refreshCalls = vi.mocked(fetch).mock.calls.filter(([input]) => {
+      const url = typeof input === "string" ? input : (input as Request).url;
+      return url.includes("/api/auth/refresh");
+    });
+    expect(refreshCalls).toHaveLength(1);
+  });
+
   it("clears the session when the refresh itself fails", async () => {
     useAuthStore.getState().setSession({ accessToken: "stale-token", user: { id: "u1", email: "a@b.com", displayName: null } });
     vi.mocked(fetch)
