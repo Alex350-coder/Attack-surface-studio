@@ -1,5 +1,5 @@
 import type { ProjectRow } from "../repositories/projects.repository";
-import type { ProjectMemberRow } from "../repositories/project-members.repository";
+import type { ProjectMemberWithUserRow } from "../repositories/project-members.repository";
 
 export interface ProjectDto {
   id: string;
@@ -14,7 +14,9 @@ export interface ProjectMemberDto {
   id: string;
   projectId: string;
   userId: string;
-  role: ProjectMemberRow["role"];
+  email: string;
+  displayName: string | null;
+  role: ProjectMemberWithUserRow["role"];
   createdAt: Date;
 }
 
@@ -30,11 +32,13 @@ export function toProjectDto(row: ProjectRow): ProjectDto {
   };
 }
 
-export function toProjectMemberDto(row: ProjectMemberRow): ProjectMemberDto {
+export function toProjectMemberDto(row: ProjectMemberWithUserRow): ProjectMemberDto {
   return {
     id: row.id,
     projectId: row.projectId,
     userId: row.userId,
+    email: row.email,
+    displayName: row.displayName,
     role: row.role,
     createdAt: row.createdAt,
   };

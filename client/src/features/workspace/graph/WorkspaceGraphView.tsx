@@ -57,7 +57,17 @@ export function WorkspaceGraphView({ projectId }: Props) {
         <h1 className="text-lg font-semibold text-[var(--color-foreground)]">{project.data?.name}</h1>
       </div>
       <div className="relative flex-1">
-        <GraphEngine data={graphModel} className="h-full w-full" />
+        {/*
+         * `h-full` on GraphEngine's own wrapper can resolve to 0 here: this ancestor's height
+         * comes purely from flex-grow (no explicit CSS height anywhere in the chain up to
+         * WorkspaceShell's `min-h-screen`), and percentage heights are unreliable against that.
+         * `absolute inset-0` sizes against the actual laid-out box of this `relative` parent
+         * instead, which is the same trick used to make anything fill a flex-grown container
+         * reliably (BUG #7 -- the graph silently failed to render for any project with data).
+         */}
+        <div className="absolute inset-0">
+          <GraphEngine data={graphModel} className="h-full w-full" />
+        </div>
       </div>
     </div>
   );

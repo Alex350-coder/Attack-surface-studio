@@ -66,8 +66,20 @@ export function ScopeEditor({ projectId }: Props) {
     return <p role="alert" className="text-sm text-[var(--node-critical)]">Failed to load the project scope.</p>;
   }
 
-  function save(nextIncludes: string[], nextExcludes: string[]): void {
-    updateProject.mutate({ scope: { includes: nextIncludes, excludes: nextExcludes } });
+  // On rejection (e.g. the server's stricter hostname/CIDR format check -- see the
+  // scopeEntrySchema comment above), roll the optimistic edit back to the pre-edit lists.
+  // Without this, a rejected entry stayed visible as if it were in effect (BUG #8): misleading
+  // for a value that gates what the Orchestrator will let a tool run touch.
+  function save(nextIncludes: string[], nextExcludes: string[], rollback: { includes: string[]; excludes: string[] }): void {
+    updateProject.mutate(
+      { scope: { includes: nextIncludes, excludes: nextExcludes } },
+      {
+        onError: () => {
+          setIncludes(rollback.includes);
+          setExcludes(rollback.excludes);
+        },
+      },
+    );
   }
 
   function addEntry(list: ScopeList, value: string): { ok: boolean; error?: string } {
@@ -75,27 +87,38 @@ export function ScopeEditor({ projectId }: Props) {
     if (!parsed.success) {
       return { ok: false, error: parsed.error.issues[0]?.message };
     }
+    const target = list === "includes" ? includes : excludes;
+    // Reject duplicates before they ever reach state (BUG #11): with no dedup check here, adding
+    // an entry already present rendered two `<li key={entry}>`s sharing one key (a real React
+    // console error) and, worse, made `removeEntry`'s value-based `.filter()` delete *every*
+    // matching entry at once -- clicking "Remove" on one of two duplicate tags silently wiped
+    // both, which is a destructive bug in a list that gates what the Orchestrator will scan.
+    if (target.includes(parsed.data)) {
+      return { ok: false, error: "This entry is already in the list." };
+    }
+    const rollback = { includes, excludes };
     if (list === "includes") {
       const next = [...includes, parsed.data];
       setIncludes(next);
-      save(next, excludes);
+      save(next, excludes, rollback);
     } else {
       const next = [...excludes, parsed.data];
       setExcludes(next);
-      save(includes, next);
+      save(includes, next, rollback);
     }
     return { ok: true };
   }
 
   function removeEntry(list: ScopeList, entry: string): void {
+    const rollback = { includes, excludes };
     if (list === "includes") {
       const next = includes.filter((item) => item !== entry);
       setIncludes(next);
-      save(next, excludes);
+      save(next, excludes, rollback);
     } else {
       const next = excludes.filter((item) => item !== entry);
       setExcludes(next);
-      save(includes, next);
+      save(includes, next, rollback);
     }
   }
 

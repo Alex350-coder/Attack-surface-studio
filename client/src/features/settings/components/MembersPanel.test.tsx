@@ -40,6 +40,8 @@ function makeMember(overrides: Partial<ProjectMember> = {}): ProjectMember {
     id: "22222222-2222-2222-2222-222222222222",
     projectId: PROJECT_ID,
     userId: "33333333-3333-3333-3333-333333333333",
+    email: "member@example.com",
+    displayName: null,
     role: "admin",
     createdAt: new Date(),
     ...overrides,
@@ -78,6 +80,26 @@ describe("MembersPanel", () => {
     vi.mocked(useAddOrAssignMember).mockReturnValue(mutationResult({}));
     render(<MembersPanel projectId={PROJECT_ID} />);
     expect(screen.getByText("admin")).toBeInTheDocument();
+  });
+
+  it("shows a member's identifying email/display name instead of the raw userId (BUG #5)", () => {
+    vi.mocked(useProjectMembers).mockReturnValue(
+      queryResult({ data: [makeMember({ email: "ana@example.com", displayName: "Ana" })] }),
+    );
+    vi.mocked(useAddOrAssignMember).mockReturnValue(mutationResult({}));
+    render(<MembersPanel projectId={PROJECT_ID} />);
+    expect(screen.getByText("Ana")).toBeInTheDocument();
+    expect(screen.getByText("ana@example.com")).toBeInTheDocument();
+    expect(screen.queryByText("33333333-3333-3333-3333-333333333333")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the email when a member has no display name (BUG #5)", () => {
+    vi.mocked(useProjectMembers).mockReturnValue(
+      queryResult({ data: [makeMember({ email: "no-name@example.com", displayName: null })] }),
+    );
+    vi.mocked(useAddOrAssignMember).mockReturnValue(mutationResult({}));
+    render(<MembersPanel projectId={PROJECT_ID} />);
+    expect(screen.getByText("no-name@example.com")).toBeInTheDocument();
   });
 
   it("opens the add/reassign dialog and submits an email + role", async () => {

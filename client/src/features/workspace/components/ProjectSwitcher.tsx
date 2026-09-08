@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useProjects } from "../api/use-projects";
+import { useProject } from "../api/use-project";
 
 type Props = {
   activeProjectId: string | null;
@@ -11,6 +12,11 @@ type Props = {
 export function ProjectSwitcher({ activeProjectId }: Props) {
   const { data: projects } = useProjects();
   const activeProject = projects?.find((project) => project.id === activeProjectId);
+  // `projects` is only the first page of the user's projects (BUG #6): the active project can be
+  // a real, accessible project that simply isn't on that page. Fall back to fetching it directly
+  // by id instead of silently falling back to the placeholder.
+  const fallbackQuery = useProject(!activeProject && activeProjectId ? activeProjectId : "");
+  const activeProjectName = activeProject?.name ?? fallbackQuery.data?.name;
 
   return (
     <div className="group relative">
@@ -18,7 +24,7 @@ export function ProjectSwitcher({ activeProjectId }: Props) {
         type="button"
         className="flex h-8 items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3.5 text-sm text-[var(--color-foreground-muted)] transition-colors hover:text-[var(--color-foreground)]"
       >
-        {activeProject?.name ?? "Select a project"}
+        {activeProjectName ?? "Select a project"}
       </button>
       {projects && projects.length > 0 ? (
         <div className="invisible absolute left-0 top-full z-10 mt-2 w-56 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-1 opacity-0 shadow-xl transition-all duration-150 group-hover:visible group-hover:opacity-100">

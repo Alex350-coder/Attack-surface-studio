@@ -62,7 +62,12 @@ export function MembersPanel({ projectId }: Props) {
 function MemberRow({ member }: { member: ProjectMember }) {
   return (
     <li className="flex items-center justify-between gap-4 rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3">
-      <span className="font-mono text-xs text-[var(--color-foreground-muted)]">{member.userId}</span>
+      <div className="flex flex-col">
+        <span className="text-sm">{member.displayName ?? member.email}</span>
+        {member.displayName ? (
+          <span className="font-mono text-xs text-[var(--color-foreground-muted)]">{member.email}</span>
+        ) : null}
+      </div>
       <Badge tone="neutral">{member.role}</Badge>
     </li>
   );

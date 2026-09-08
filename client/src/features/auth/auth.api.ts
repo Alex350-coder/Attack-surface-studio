@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiError, type ApiEnvelope } from "@/lib/api-envelope";
 import { useAuthStore, type AuthUser } from "./auth.store";
 
@@ -55,6 +55,7 @@ export function useRegister() {
 }
 
 export function useLogout() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
       const accessToken = useAuthStore.getState().accessToken;
@@ -66,6 +67,10 @@ export function useLogout() {
     },
     onSuccess: () => {
       useAuthStore.getState().clear();
+      // Drops every cached query (projects, graph data, members, ...) so a different account
+      // logging in next in this same tab never renders the previous account's cached server
+      // state (BUG #6 -- discovered while investigating a stale "Select a project" header).
+      queryClient.clear();
     },
   });
 }

@@ -37,21 +37,40 @@ async function rawRequest<T>(path: string, options: RequestOptions): Promise<{ s
   return { status: response.status, envelope };
 }
 
+// Coalesces concurrent refresh attempts into a single in-flight request. The refresh token is
+// single-use and rotates server-side (SEC-004); if multiple 401s fired one refresh call each,
+// every call after the first would replay an already-rotated token, tripping reuse-detection
+// and revoking the whole session chain -- including the just-issued one -- and spuriously
+// logging out a legitimately-authenticated user (BUG #1).
+let inFlightRefresh: Promise<string | null> | null = null;
+
 /**
  * Refreshes the access token once via the BFF route (never the backend directly -- only the
  * route handler can read the httpOnly refresh cookie, SEC-035). Returns the new token, or null
- * if the refresh itself failed (session is gone; caller must sign the user out).
+ * if the refresh itself failed (session is gone; caller must sign the user out). Safe to call
+ * concurrently -- overlapping callers share the same underlying request. Exported so every call
+ * site (the 401-retry path here and `useBootstrapSession`'s hard-reload bootstrap) shares this
+ * one de-duped implementation rather than each racing its own raw `fetch` (BUG #2, same root
+ * cause as BUG #1 -- React Strict Mode's double-effect-invoke on mount was enough to trigger it).
  */
-async function refreshAccessToken(): Promise<string | null> {
-  try {
-    const response = await fetch("/api/auth/refresh", { method: "POST", credentials: "include" });
-    const envelope = (await response.json()) as ApiEnvelope<{ accessToken: string }>;
-    if (!envelope.success) return null;
-    useAuthStore.getState().setAccessToken(envelope.data.accessToken);
-    return envelope.data.accessToken;
-  } catch {
-    return null;
-  }
+export async function refreshAccessToken(): Promise<string | null> {
+  if (inFlightRefresh) return inFlightRefresh;
+
+  inFlightRefresh = (async () => {
+    try {
+      const response = await fetch("/api/auth/refresh", { method: "POST", credentials: "include" });
+      const envelope = (await response.json()) as ApiEnvelope<{ accessToken: string }>;
+      if (!envelope.success) return null;
+      useAuthStore.getState().setAccessToken(envelope.data.accessToken);
+      return envelope.data.accessToken;
+    } catch {
+      return null;
+    } finally {
+      inFlightRefresh = null;
+    }
+  })();
+
+  return inFlightRefresh;
 }
 
 /**

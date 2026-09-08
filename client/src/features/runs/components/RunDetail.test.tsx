@@ -54,6 +54,36 @@ describe("RunDetail", () => {
     expect(screen.queryByRole("button", { name: "View raw output" })).not.toBeInTheDocument();
   });
 
+  it("shows the run's error message for a failed run (BUG #10)", () => {
+    const failedRun = { ...RUN, status: "failed" as const, error: { code: "NON_ZERO_EXIT", message: "nmap exited with status 1" } };
+    vi.mocked(useRun).mockReturnValue({ isLoading: false, isError: false, data: failedRun } as never);
+    vi.mocked(useCurrentRole).mockReturnValue({ role: "member", isLoading: false, isError: false });
+
+    render(<RunDetail projectId={PROJECT_ID} runId={RUN_ID} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("NON_ZERO_EXIT");
+    expect(screen.getByRole("alert")).toHaveTextContent("nmap exited with status 1");
+  });
+
+  it("shows nothing extra for a failed run with an unreadable error shape", () => {
+    const failedRun = { ...RUN, status: "failed" as const, error: "some unstructured string" };
+    vi.mocked(useRun).mockReturnValue({ isLoading: false, isError: false, data: failedRun } as never);
+    vi.mocked(useCurrentRole).mockReturnValue({ role: "member", isLoading: false, isError: false });
+
+    render(<RunDetail projectId={PROJECT_ID} runId={RUN_ID} />);
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("does not show an error block for a succeeded run", () => {
+    vi.mocked(useRun).mockReturnValue({ isLoading: false, isError: false, data: RUN } as never);
+    vi.mocked(useCurrentRole).mockReturnValue({ role: "member", isLoading: false, isError: false });
+
+    render(<RunDetail projectId={PROJECT_ID} runId={RUN_ID} />);
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("fetches and opens the raw output as a blob URL for an owner", async () => {
     vi.mocked(useRun).mockReturnValue({ isLoading: false, isError: false, data: RUN } as never);
     vi.mocked(useCurrentRole).mockReturnValue({ role: "owner", isLoading: false, isError: false });

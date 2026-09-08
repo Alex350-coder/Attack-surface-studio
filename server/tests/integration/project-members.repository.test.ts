@@ -40,7 +40,7 @@ describe("ProjectMembersRepository", () => {
     expect(await repo.findByProjectAndUser(project.id, user.id)).toMatchObject({ id: created.id });
   });
 
-  it("lists members for a project, paginated", async () => {
+  it("lists members for a project, paginated, joined with their identifying user fields (BUG #5)", async () => {
     const { project, user } = await createFixtures();
     await repo.addMember({ projectId: project.id, userId: user.id, role: "owner" });
 
@@ -48,6 +48,7 @@ describe("ProjectMembersRepository", () => {
 
     expect(page.items).toHaveLength(1);
     expect(page.total).toBe(1);
+    expect(page.items[0]).toMatchObject({ userId: user.id, email: "owner@example.com", displayName: null });
   });
 
   it("updates a member's role", async () => {

@@ -11,20 +11,12 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/api-client", () => ({
   apiRequest: vi.fn(),
+  refreshAccessToken: vi.fn(),
 }));
 
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-}
-
 describe("useBootstrapSession", () => {
-  beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn());
-  });
-
   afterEach(() => {
     cleanup();
-    vi.unstubAllGlobals();
     replace.mockClear();
     useAuthStore.getState().clear();
   });
@@ -38,8 +30,8 @@ describe("useBootstrapSession", () => {
   });
 
   it("silently refreshes the session on a hard reload and becomes ready", async () => {
-    const { apiRequest } = await import("@/lib/api-client");
-    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(200, { success: true, data: { accessToken: "fresh" } }));
+    const { apiRequest, refreshAccessToken } = await import("@/lib/api-client");
+    vi.mocked(refreshAccessToken).mockResolvedValueOnce("fresh");
     vi.mocked(apiRequest).mockResolvedValueOnce({ id: "u1", email: "a@b.com", displayName: null });
 
     const { result } = renderHook(() => useBootstrapSession());
@@ -49,10 +41,29 @@ describe("useBootstrapSession", () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
+  it("still sets the user even though refreshAccessToken flips accessToken mid-bootstrap (BUG #9)", async () => {
+    // The real `refreshAccessToken` sets `accessToken` on the store as soon as it resolves,
+    // *before* `/auth/me` returns -- reproduce that here instead of a bare resolved value, since
+    // a mock that only returns a token (as the test above does) can't expose the effect
+    // re-running and tearing down the in-flight bootstrap before `setSession` runs.
+    const { apiRequest, refreshAccessToken } = await import("@/lib/api-client");
+    vi.mocked(refreshAccessToken).mockImplementationOnce(async () => {
+      useAuthStore.getState().setAccessToken("fresh");
+      return "fresh";
+    });
+    vi.mocked(apiRequest).mockResolvedValueOnce({ id: "u1", email: "a@b.com", displayName: null });
+
+    renderHook(() => useBootstrapSession());
+
+    // `isReady` flips true as soon as `accessToken` is set (by design, see auth.store.ts's
+    // `useIsAuthenticated`), which is exactly what let this race hide before -- so this
+    // assertion waits on `user` directly rather than on `isReady`.
+    await waitFor(() => expect(useAuthStore.getState().user).toEqual({ id: "u1", email: "a@b.com", displayName: null }));
+  });
+
   it("clears the store and redirects to /login when the refresh cookie is missing or invalid", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      jsonResponse(401, { success: false, error: { message: "No session", code: "UNAUTHORIZED", correlationId: "c" } }),
-    );
+    const { refreshAccessToken } = await import("@/lib/api-client");
+    vi.mocked(refreshAccessToken).mockResolvedValueOnce(null);
 
     renderHook(() => useBootstrapSession());
 

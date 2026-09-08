@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiRequest } from "@/lib/api-client";
-import type { ApiEnvelope } from "@/lib/api-envelope";
+import { apiRequest, refreshAccessToken } from "@/lib/api-client";
 import { useAuthStore, useIsAuthenticated, type AuthUser } from "./auth.store";
 
 /**
@@ -19,7 +18,15 @@ export function useBootstrapSession(): { isReady: boolean } {
   const [bootstrapped, setBootstrapped] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    // Read the store directly instead of depending on the reactive `isAuthenticated` value below.
+    // `refreshAccessToken()` inside `bootstrap()` calls `setAccessToken` as soon as it resolves,
+    // which flips `isAuthenticated` true *before* `/auth/me` has returned. If this effect
+    // depended on `isAuthenticated`, that flip would re-run it -- tearing down this in-flight
+    // call (`cancelled = true`) right as it awaits `/auth/me`, so `setSession` never lands and
+    // `user` stays `null` forever even though `accessToken` is set (BUG #9: every user-derived
+    // UI, e.g. RunDetail's owner/admin-gated "View raw output" button, silently stayed hidden for
+    // a real owner after any hard reload).
+    if (useAuthStore.getState().accessToken !== null) {
       return;
     }
 
@@ -27,17 +34,15 @@ export function useBootstrapSession(): { isReady: boolean } {
 
     async function bootstrap(): Promise<void> {
       try {
-        const response = await fetch("/api/auth/refresh", { method: "POST", credentials: "include" });
-        const envelope = (await response.json()) as ApiEnvelope<{ accessToken: string }>;
-        if (!envelope.success) {
+        const accessToken = await refreshAccessToken();
+        if (!accessToken) {
           throw new Error("Session expired");
         }
 
-        useAuthStore.getState().setAccessToken(envelope.data.accessToken);
         const user = await apiRequest<AuthUser>("/auth/me");
         if (cancelled) return;
 
-        useAuthStore.getState().setSession({ accessToken: envelope.data.accessToken, user });
+        useAuthStore.getState().setSession({ accessToken, user });
         setBootstrapped(true);
       } catch {
         if (cancelled) return;
@@ -50,7 +55,11 @@ export function useBootstrapSession(): { isReady: boolean } {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, router]);
+    // Bootstrap must run exactly once per mount, regardless of `isAuthenticated` or `router`
+    // identity changing along the way -- see the comment above for why depending on either
+    // reopens the same race.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return { isReady: isAuthenticated || bootstrapped };
 }
