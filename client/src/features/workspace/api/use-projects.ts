@@ -21,7 +21,14 @@ export function useProjects() {
   return useQuery({
     queryKey: ["projects"] as const,
     queryFn: async () => {
-      const { items } = await apiRequestPaginated<unknown[]>("/projects");
+      // The server paginates every list endpoint (PERF-001) and defaults to
+      // DEFAULT_PAGE_SIZE=25 when no `pageSize` is given. ProjectList has no "load more"/pager UI
+      // (that's tracked separately as future pagination/caching work per Plan.md), so without an
+      // explicit pageSize an account with more than 25 projects silently lost access to the rest
+      // from the Projects page -- no error, no indicator, nothing (BUG #12). Requesting the
+      // server's hard cap (MAX_PAGE_SIZE=100, repository.types.ts) closes that gap for any
+      // realistic project count; a true paginated UI is still needed beyond 100.
+      const { items } = await apiRequestPaginated<unknown[]>("/projects?pageSize=100");
       return projectListSchema.parse(items);
     },
   });
