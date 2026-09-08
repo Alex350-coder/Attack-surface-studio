@@ -104,6 +104,28 @@ describe("ScopeEditor", () => {
     expect(mutate.mock.calls[0][0]).toEqual({ scope: { includes: [], excludes: [] } });
   });
 
+  it("rejects a duplicate entry instead of adding it a second time (BUG #11)", async () => {
+    // Before this fix, adding a value already in the list succeeded silently: two `<li
+    // key={entry}>`s ended up sharing one React key (a real console error), and clicking
+    // "Remove" on either duplicate tag deleted BOTH at once, because `removeEntry` filters by
+    // value, not by the specific instance clicked -- a destructive bug in a list that gates what
+    // the Orchestrator will scan.
+    const user = userEvent.setup();
+    const mutate = vi.fn();
+    vi.mocked(useProject).mockReturnValue(queryResult({ data: makeProject() }));
+    vi.mocked(useUpdateProject).mockReturnValue(mutationResult({ mutate }));
+
+    render(<ScopeEditor projectId={PROJECT_ID} />);
+
+    const [includeInput] = screen.getAllByLabelText("Add entry");
+    await user.type(includeInput, "example.com");
+    await user.click(screen.getAllByRole("button", { name: "Add" })[0]);
+
+    expect(mutate).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent("This entry is already in the list.");
+    expect(screen.getAllByText("example.com")).toHaveLength(1);
+  });
+
   it("rolls back an optimistic add when the server rejects it (BUG #8)", async () => {
     // The server independently re-validates each scope entry's format (FE-006) and can reject
     // an entry the lenient client-side check let through. Before this fix, the rejected entry

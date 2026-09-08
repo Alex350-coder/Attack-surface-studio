@@ -87,6 +87,15 @@ export function ScopeEditor({ projectId }: Props) {
     if (!parsed.success) {
       return { ok: false, error: parsed.error.issues[0]?.message };
     }
+    const target = list === "includes" ? includes : excludes;
+    // Reject duplicates before they ever reach state (BUG #11): with no dedup check here, adding
+    // an entry already present rendered two `<li key={entry}>`s sharing one key (a real React
+    // console error) and, worse, made `removeEntry`'s value-based `.filter()` delete *every*
+    // matching entry at once -- clicking "Remove" on one of two duplicate tags silently wiped
+    // both, which is a destructive bug in a list that gates what the Orchestrator will scan.
+    if (target.includes(parsed.data)) {
+      return { ok: false, error: "This entry is already in the list." };
+    }
     const rollback = { includes, excludes };
     if (list === "includes") {
       const next = [...includes, parsed.data];
