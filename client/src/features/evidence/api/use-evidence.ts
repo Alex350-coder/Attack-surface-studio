@@ -25,9 +25,12 @@ export function useEvidence(projectId: string, nodeId?: string) {
   return useQuery({
     queryKey: ["projects", projectId, "evidence", { nodeId: nodeId ?? null }] as const,
     queryFn: async () => {
+      // Same fix as use-projects.ts (BUG #12): request the server's hard page-size cap since
+      // EvidenceGrid has no pager UI, so anything past DEFAULT_PAGE_SIZE=25 would otherwise
+      // silently vanish from view.
       const path = nodeId
-        ? `/projects/${projectId}/evidence?nodeId=${encodeURIComponent(nodeId)}`
-        : `/projects/${projectId}/evidence`;
+        ? `/projects/${projectId}/evidence?nodeId=${encodeURIComponent(nodeId)}&pageSize=100`
+        : `/projects/${projectId}/evidence?pageSize=100`;
       const { items } = await apiRequestPaginated<unknown[]>(path);
       return evidenceFileListSchema.parse(items);
     },
