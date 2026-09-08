@@ -86,7 +86,7 @@ describe("ScopeEditor", () => {
     await user.type(includeInput, "sub.example.com");
     await user.click(screen.getAllByRole("button", { name: "Add" })[0]);
 
-    expect(mutate).toHaveBeenCalledWith({
+    expect(mutate.mock.calls[0][0]).toEqual({
       scope: { includes: ["example.com", "sub.example.com"], excludes: [] },
     });
   });
@@ -101,6 +101,28 @@ describe("ScopeEditor", () => {
 
     await user.click(screen.getByRole("button", { name: "Remove example.com" }));
 
-    expect(mutate).toHaveBeenCalledWith({ scope: { includes: [], excludes: [] } });
+    expect(mutate.mock.calls[0][0]).toEqual({ scope: { includes: [], excludes: [] } });
+  });
+
+  it("rolls back an optimistic add when the server rejects it (BUG #8)", async () => {
+    // The server independently re-validates each scope entry's format (FE-006) and can reject
+    // an entry the lenient client-side check let through. Before this fix, the rejected entry
+    // stayed visible in the "In scope" list as if it were saved -- misleading for a value that
+    // gates what the Orchestrator will let a tool run touch.
+    const user = userEvent.setup();
+    const mutate: UpdateProjectMutation["mutate"] = vi.fn((_input, options) => {
+      options?.onError?.(new Error("Invalid request payload"), _input, undefined, {} as never);
+    });
+    vi.mocked(useProject).mockReturnValue(queryResult({ data: makeProject() }));
+    vi.mocked(useUpdateProject).mockReturnValue(mutationResult({ mutate }));
+
+    render(<ScopeEditor projectId={PROJECT_ID} />);
+
+    const [includeInput] = screen.getAllByLabelText("Add entry");
+    await user.type(includeInput, "<script>alert(1)</script>");
+    await user.click(screen.getAllByRole("button", { name: "Add" })[0]);
+
+    expect(screen.queryByText("<script>alert(1)</script>")).not.toBeInTheDocument();
+    expect(screen.getByText("example.com")).toBeInTheDocument();
   });
 });
