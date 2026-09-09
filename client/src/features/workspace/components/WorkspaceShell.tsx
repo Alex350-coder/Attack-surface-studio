@@ -8,6 +8,7 @@ import { useAuthUser } from "@/features/auth/auth.store";
 import { useLogout } from "@/features/auth/auth.api";
 import { useBootstrapSession } from "@/features/auth/use-bootstrap-session";
 import { Button } from "@/components/ui/button";
+import { BackgroundLayer } from "@/components/effects/BackgroundLayer";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 
 type Props = {
@@ -43,8 +44,12 @@ export function WorkspaceShell({ children }: Props) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--color-background)]">
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--color-border)] px-6">
+    <div className="relative flex min-h-screen flex-col bg-[var(--color-background)]">
+      {/* Same shared effect as the Hero/login/register (FE-012 lineage). Kept subtle here: the
+       * header gets a frosted backdrop and page content keeps its own solid surfaces (project
+       * cards, the graph canvas card) so the animation reads as ambient texture, not clutter. */}
+      <BackgroundLayer />
+      <header className="relative z-10 flex h-14 shrink-0 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-background)]/70 px-6 backdrop-blur-sm">
         <div className="flex items-center gap-6">
           <Link href="/app" className="flex items-center gap-2 text-sm font-semibold tracking-tight text-[var(--color-foreground)]">
             <Radar size={20} strokeWidth={2} className="text-[var(--color-accent-strong)]" />
@@ -61,7 +66,7 @@ export function WorkspaceShell({ children }: Props) {
           </Button>
         </div>
       </header>
-      <main className="flex flex-1 flex-col">{children}</main>
+      <main className="relative z-10 flex flex-1 flex-col">{children}</main>
     </div>
   );
 }

@@ -53,10 +53,15 @@ export function WorkspaceGraphView({ projectId }: Props) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className="border-b border-[var(--color-border)] px-6 py-4">
+      <div className="border-b border-[var(--color-border)] bg-[var(--color-background)]/70 px-6 py-4 backdrop-blur-sm">
         <h1 className="text-lg font-semibold text-[var(--color-foreground)]">{project.data?.name}</h1>
       </div>
-      <div className="relative flex-1">
+      {/*
+       * Same frosted-card treatment as the Hero's GraphStage: the particle background now mounted
+       * behind the whole workspace (WorkspaceShell) would otherwise bleed straight through React
+       * Flow's transparent dot grid and compete with node/edge legibility.
+       */}
+      <div className="relative flex-1 bg-[var(--color-background-elevated)]/60 backdrop-blur-sm">
         {/*
          * `h-full` on GraphEngine's own wrapper can resolve to 0 here: this ancestor's height
          * comes purely from flex-grow (no explicit CSS height anywhere in the chain up to
