@@ -24,4 +24,12 @@ describe("Navbar", () => {
 
     expect(screen.getByRole("link", { name: /Attack Surface Studio/ })).toHaveAttribute("href", "/");
   });
+
+  it("points Platform, How it works, and Docs at real destinations", () => {
+    render(<Navbar isAuthenticated={false} />);
+
+    expect(screen.getByRole("link", { name: "Platform" })).toHaveAttribute("href", "/#platform");
+    expect(screen.getByRole("link", { name: "How it works" })).toHaveAttribute("href", "/#how-it-works");
+    expect(screen.getByRole("link", { name: "Docs" })).toHaveAttribute("href", "/docs");
+  });
 });

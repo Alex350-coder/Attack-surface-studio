@@ -7,15 +7,16 @@ interface InfoSectionItem {
 }
 
 interface InfoSectionProps {
+  id?: string
   eyebrow: string
   title: string
   description: string
   items: InfoSectionItem[]
 }
 
-export function InfoSection({ eyebrow, title, description, items }: InfoSectionProps) {
+export function InfoSection({ id, eyebrow, title, description, items }: InfoSectionProps) {
   return (
-    <section className="mx-auto w-full max-w-6xl px-6 py-[var(--space-section)] sm:px-10">
+    <section id={id} className="mx-auto w-full max-w-6xl px-6 py-[var(--space-section)] sm:px-10">
       <div className="max-w-2xl">
         <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-accent-strong)]">
           {eyebrow}

@@ -1,6 +1,18 @@
+import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
 
 export const REFRESH_TOKEN_COOKIE = "refresh_token";
+
+/**
+ * Coarse "is there a session" check for Server Components on public routes (the Hero, /docs).
+ * Mirrors proxy.ts's gate on /app: presence of the httpOnly refresh-token cookie, not proof it's
+ * still valid. Safe because it only ever drives which CTA copy/href renders — real authorization
+ * for /app is still enforced by WorkspaceShell's useBootstrapSession on the client.
+ */
+export async function getHasSession(): Promise<boolean> {
+  const cookieStore = await cookies();
+  return cookieStore.has(REFRESH_TOKEN_COOKIE);
+}
 
 const DEFAULT_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // matches the backend's default JWT_REFRESH_TTL (7d)
 

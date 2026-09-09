@@ -2,10 +2,12 @@ import Link from 'next/link'
 import { Radar } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 
+// Absolute paths (not bare "#anchor") so these still resolve correctly when Navbar renders on a
+// route other than "/" (e.g. /docs) — Link navigates home first, then scrolls to the section.
 const NAV_LINKS = [
-  { label: 'Platform', href: '#platform' },
-  { label: 'How it works', href: '#how-it-works' },
-  { label: 'Docs', href: '#' },
+  { label: 'Platform', href: '/#platform' },
+  { label: 'How it works', href: '/#how-it-works' },
+  { label: 'Docs', href: '/docs' },
 ]
 
 interface NavbarProps {
@@ -24,13 +26,13 @@ export function Navbar({ isAuthenticated }: NavbarProps) {
       </Link>
       <nav className="hidden items-center gap-8 md:flex">
         {NAV_LINKS.map((link) => (
-          <a
+          <Link
             key={link.label}
             href={link.href}
             className="text-sm text-[var(--color-foreground-muted)] transition-colors duration-200 hover:text-[var(--color-foreground)]"
           >
             {link.label}
-          </a>
+          </Link>
         ))}
       </nav>
       <Link href={ctaHref} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>

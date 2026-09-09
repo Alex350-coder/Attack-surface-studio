@@ -3,12 +3,12 @@
 import { useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { FileText, Search, Share2, ShieldCheck, Users, Zap } from 'lucide-react'
-import { Navbar } from './components/Navbar'
 import { HeroContent } from './components/HeroContent'
 import { CTAGroup } from './components/CTAGroup'
 import { GraphStage } from './components/GraphStage'
-import { InfoSection } from './components/InfoSection'
-import { Footer } from './components/Footer'
+import { Navbar } from '@/components/marketing/Navbar'
+import { InfoSection } from '@/components/marketing/InfoSection'
+import { Footer } from '@/components/marketing/Footer'
 import { BackgroundLayer } from '@/components/effects/BackgroundLayer'
 
 const GraphPreview = dynamic(() => import('./components/GraphPreview'), {
@@ -80,12 +80,14 @@ export function HeroSection({ hasSession }: HeroSectionProps) {
         </GraphStage>
       </div>
       <InfoSection
+        id="platform"
         eyebrow="Platform"
         title="One graph, every signal"
         description="Every asset, finding, and piece of evidence lives on the same canvas — so context never gets lost between tools."
         items={PLATFORM_ITEMS}
       />
       <InfoSection
+        id="how-it-works"
         eyebrow="How it works"
         title="From signal to story"
         description="Watch an investigation unfold in real time, from the first discovered asset to the final report."
