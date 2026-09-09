@@ -20,13 +20,15 @@ const MEMBER = {
 describe("useProjectMembers", () => {
   afterEach(() => vi.clearAllMocks());
 
-  it("fetches and Zod-parses the project's member list", async () => {
+  it("fetches and Zod-parses the project's member list, requesting the server's max page size (BUG #12 sibling)", async () => {
+    // MembersPanel has no pager UI -- without an explicit pageSize, a project with more than
+    // DEFAULT_PAGE_SIZE=25 members would silently lose access to the rest, with no indication.
     vi.mocked(apiRequestPaginated).mockResolvedValue({ items: [MEMBER] });
 
     const { result } = renderHook(() => useProjectMembers(PROJECT_ID), { wrapper: queryClientWrapper() });
 
     await waitFor(() => expect(result.current.data).toHaveLength(1));
-    expect(apiRequestPaginated).toHaveBeenCalledWith(`/projects/${PROJECT_ID}/members`);
+    expect(apiRequestPaginated).toHaveBeenCalledWith(`/projects/${PROJECT_ID}/members?pageSize=100`);
   });
 });
 

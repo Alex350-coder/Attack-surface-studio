@@ -28,7 +28,10 @@ export function useReports(projectId: string) {
   return useQuery({
     queryKey: ["projects", projectId, "reports"] as const,
     queryFn: async () => {
-      const { items } = await apiRequestPaginated<unknown[]>(`/projects/${projectId}/reports`);
+      // Same fix as use-projects.ts (BUG #12): request the server's hard page-size cap since
+      // the reports list has no pager UI, so anything past DEFAULT_PAGE_SIZE=25 would otherwise
+      // silently vanish from view.
+      const { items } = await apiRequestPaginated<unknown[]>(`/projects/${projectId}/reports?pageSize=100`);
       return reportListSchema.parse(items);
     },
     enabled: projectId.length > 0,

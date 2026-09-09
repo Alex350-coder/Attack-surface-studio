@@ -9,7 +9,7 @@ import { CTAGroup } from './components/CTAGroup'
 import { GraphStage } from './components/GraphStage'
 import { InfoSection } from './components/InfoSection'
 import { Footer } from './components/Footer'
-import { BackgroundLayer } from './background/BackgroundLayer'
+import { BackgroundLayer } from '@/components/effects/BackgroundLayer'
 
 const GraphPreview = dynamic(() => import('./components/GraphPreview'), {
   ssr: false,
@@ -56,18 +56,25 @@ const HOW_IT_WORKS_ITEMS = [
   },
 ]
 
-export function HeroSection() {
+interface HeroSectionProps {
+  hasSession: boolean
+}
+
+export function HeroSection({ hasSession }: HeroSectionProps) {
   const graphStageRef = useRef<HTMLDivElement>(null)
 
   return (
     <div className="relative flex flex-1 flex-col">
       <BackgroundLayer focusRef={graphStageRef} />
-      <Navbar />
+      <Navbar isAuthenticated={hasSession} />
       <main className="relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center gap-10 px-6 py-16 text-center sm:px-10 lg:py-24">
         <HeroContent />
-        <CTAGroup />
+        <CTAGroup isAuthenticated={hasSession} />
       </main>
-      <div className="relative z-10 mx-auto w-full max-w-[1600px] px-6 py-[var(--space-section)] sm:px-10">
+      <div
+        id="graph-preview"
+        className="relative z-10 mx-auto w-full max-w-[1600px] px-6 py-[var(--space-section)] sm:px-10"
+      >
         <GraphStage containerRef={graphStageRef}>
           <GraphPreview />
         </GraphStage>

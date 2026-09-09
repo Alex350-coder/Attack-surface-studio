@@ -1,16 +1,24 @@
+import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 
-export function CTAGroup() {
+interface CTAGroupProps {
+  isAuthenticated: boolean
+}
+
+export function CTAGroup({ isAuthenticated }: CTAGroupProps) {
+  const ctaHref = isAuthenticated ? '/app' : '/register'
+  const ctaLabel = isAuthenticated ? 'Go to app' : 'Request access'
+
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-      <Button size="lg">
-        Request access
+      <Link href={ctaHref} className={buttonVariants({ size: 'lg' })}>
+        {ctaLabel}
         <ArrowRight size={16} />
-      </Button>
-      <Button variant="ghost" size="lg">
+      </Link>
+      <Link href="#graph-preview" className={buttonVariants({ variant: 'ghost', size: 'lg' })}>
         Explore the graph engine
-      </Button>
+      </Link>
     </div>
   )
 }

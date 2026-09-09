@@ -2,6 +2,7 @@
 
 import { useMemo, type ReactNode } from "react";
 import Link from "next/link";
+import { Radar } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuthUser } from "@/features/auth/auth.store";
 import { useLogout } from "@/features/auth/auth.api";
@@ -45,7 +46,8 @@ export function WorkspaceShell({ children }: Props) {
     <div className="flex min-h-screen flex-col bg-[var(--color-background)]">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--color-border)] px-6">
         <div className="flex items-center gap-6">
-          <Link href="/app" className="text-sm font-semibold tracking-tight text-[var(--color-foreground)]">
+          <Link href="/app" className="flex items-center gap-2 text-sm font-semibold tracking-tight text-[var(--color-foreground)]">
+            <Radar size={20} strokeWidth={2} className="text-[var(--color-accent-strong)]" />
             Attack Surface Studio
           </Link>
           <ProjectSwitcher activeProjectId={activeProjectId} />

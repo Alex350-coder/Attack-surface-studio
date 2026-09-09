@@ -22,7 +22,10 @@ export function useProjectMembers(projectId: string) {
   return useQuery({
     queryKey: ["projects", projectId, "members"] as const,
     queryFn: async () => {
-      const { items } = await apiRequestPaginated<unknown[]>(`/projects/${projectId}/members`);
+      // Same fix as use-projects.ts (BUG #12): request the server's hard page-size cap since
+      // MembersPanel has no pager UI, so anything past DEFAULT_PAGE_SIZE=25 would otherwise
+      // silently vanish from view.
+      const { items } = await apiRequestPaginated<unknown[]>(`/projects/${projectId}/members?pageSize=100`);
       return projectMemberListSchema.parse(items);
     },
     enabled: projectId.length > 0,

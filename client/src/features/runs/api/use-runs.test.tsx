@@ -35,13 +35,15 @@ describe("isNonTerminal", () => {
 describe("useRuns", () => {
   afterEach(() => vi.clearAllMocks());
 
-  it("fetches and Zod-parses the project's run list", async () => {
+  it("fetches and Zod-parses the project's run list, requesting the server's max page size (BUG #12 sibling)", async () => {
+    // RunsList has no pager UI -- without an explicit pageSize, a project with more than
+    // DEFAULT_PAGE_SIZE=25 runs would silently lose access to the rest, with no indication.
     vi.mocked(apiRequestPaginated).mockResolvedValue({ items: [RUN] });
 
     const { result } = renderHook(() => useRuns(PROJECT_ID), { wrapper: queryClientWrapper() });
 
     await waitFor(() => expect(result.current.data).toHaveLength(1));
-    expect(apiRequestPaginated).toHaveBeenCalledWith(`/projects/${PROJECT_ID}/runs`);
+    expect(apiRequestPaginated).toHaveBeenCalledWith(`/projects/${PROJECT_ID}/runs?pageSize=100`);
   });
 });
 

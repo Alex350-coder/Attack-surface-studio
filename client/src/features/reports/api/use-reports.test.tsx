@@ -22,12 +22,14 @@ const REPORT = {
 describe("useReports", () => {
   afterEach(() => vi.clearAllMocks());
 
-  it("fetches and Zod-parses the project's report list", async () => {
+  it("fetches and Zod-parses the project's report list, requesting the server's max page size (BUG #12 sibling)", async () => {
+    // The reports list has no pager UI -- without an explicit pageSize, a project with more than
+    // DEFAULT_PAGE_SIZE=25 reports would silently lose access to the rest, with no indication.
     vi.mocked(apiRequestPaginated).mockResolvedValue({ items: [REPORT] });
 
     const { result } = renderHook(() => useReports(PROJECT_ID), { wrapper: queryClientWrapper() });
 
     await waitFor(() => expect(result.current.data).toHaveLength(1));
-    expect(apiRequestPaginated).toHaveBeenCalledWith(`/projects/${PROJECT_ID}/reports`);
+    expect(apiRequestPaginated).toHaveBeenCalledWith(`/projects/${PROJECT_ID}/reports?pageSize=100`);
   });
 });

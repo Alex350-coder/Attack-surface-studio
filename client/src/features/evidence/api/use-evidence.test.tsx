@@ -23,13 +23,15 @@ const EVIDENCE = {
 describe("useEvidence", () => {
   afterEach(() => vi.clearAllMocks());
 
-  it("fetches and Zod-parses the project's evidence list", async () => {
+  it("fetches and Zod-parses the project's evidence list, requesting the server's max page size (BUG #12 sibling)", async () => {
+    // EvidenceGrid has no pager UI -- without an explicit pageSize, a project with more than
+    // DEFAULT_PAGE_SIZE=25 evidence files would silently lose access to the rest, with no indication.
     vi.mocked(apiRequestPaginated).mockResolvedValue({ items: [EVIDENCE] });
 
     const { result } = renderHook(() => useEvidence(PROJECT_ID), { wrapper: queryClientWrapper() });
 
     await waitFor(() => expect(result.current.data).toHaveLength(1));
-    expect(apiRequestPaginated).toHaveBeenCalledWith(`/projects/${PROJECT_ID}/evidence`);
+    expect(apiRequestPaginated).toHaveBeenCalledWith(`/projects/${PROJECT_ID}/evidence?pageSize=100`);
   });
 
   it("scopes the query by nodeId when provided", async () => {
@@ -38,7 +40,7 @@ describe("useEvidence", () => {
     renderHook(() => useEvidence(PROJECT_ID, "node-1"), { wrapper: queryClientWrapper() });
 
     await waitFor(() =>
-      expect(apiRequestPaginated).toHaveBeenCalledWith(`/projects/${PROJECT_ID}/evidence?nodeId=node-1`),
+      expect(apiRequestPaginated).toHaveBeenCalledWith(`/projects/${PROJECT_ID}/evidence?nodeId=node-1&pageSize=100`),
     );
   });
 });
