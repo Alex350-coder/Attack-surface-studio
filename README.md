@@ -10,7 +10,7 @@ hallazgos manuales, capturas, notas, reportes— en un cuerpo de conocimiento na
 > cada adaptador produce exactamente tres cosas —**Nodos**, **Aristas** y **Metadatos**— y eso es lo
 > que leen la interfaz, los reportes y el asistente de IA.
 
-![Landing de Attack Surface Studio](screenshots/01-landing.png)
+![Landing de Attack Surface Studio](screenshots/01-landing.jpg)
 
 ---
 
@@ -54,8 +54,8 @@ API y de la interfaz.
 
 <table>
   <tr>
-    <td width="50%"><img src="screenshots/02-login.png" alt="Pantalla de inicio de sesión"></td>
-    <td width="50%"><img src="screenshots/03-register.png" alt="Pantalla de registro"></td>
+    <td width="50%"><img src="screenshots/02-login.jpg" alt="Pantalla de inicio de sesión"></td>
+    <td width="50%"><img src="screenshots/03-register.jpg" alt="Pantalla de registro"></td>
   </tr>
   <tr>
     <td align="center" colspan="2"><sub>Inicio de sesión y registro</sub></td>
@@ -64,8 +64,8 @@ API y de la interfaz.
 
 <table>
   <tr>
-    <td width="50%"><img src="screenshots/04-projects-vacio.png" alt="Estado inicial sin proyectos"></td>
-    <td width="50%"><img src="screenshots/09-proyectos.png" alt="Lista de proyectos con un proyecto"></td>
+    <td width="50%"><img src="screenshots/04-projects-vacio.jpg" alt="Estado inicial sin proyectos"></td>
+    <td width="50%"><img src="screenshots/09-proyectos.jpg" alt="Lista de proyectos con un proyecto"></td>
   </tr>
   <tr>
     <td align="center" colspan="2"><sub>Estado vacío y lista de proyectos</sub></td>
@@ -76,12 +76,12 @@ API y de la interfaz.
 
 | Formulario y estado inicial | Detalle de la ejecución |
 |---|---|
-| <img src="screenshots/06-runs-vacio.png" alt="Pestaña Runs sin ejecuciones"> | <img src="screenshots/11-run-detalle.png" alt="Detalle de la ejecución"> |
+| <img src="screenshots/06-runs-vacio.jpg" alt="Pestaña Runs sin ejecuciones"> | <img src="screenshots/11-run-detalle.jpg" alt="Detalle de la ejecución"> |
 
 La vista de Runs muestra el formulario de ejecución (adaptador + objetivo) y el historial completo
 de ejecuciones con su estado y su duración.
 
-<img src="screenshots/10-runs.png" alt="Pestaña Runs con historial de ejecuciones">
+<img src="screenshots/10-runs.jpg" alt="Pestaña Runs con historial de ejecuciones">
 
 ### Grafo de conocimiento
 
@@ -89,11 +89,11 @@ Todo proyecto arranca sin descubrimientos, y se va llenando a medida que se ejec
 
 | Proyecto recién creado | Grafo con activos y hallazgo |
 |---|---|
-| <img src="screenshots/05-grafo-sin-datos.png" alt="Proyecto recién creado sin descubrimientos"> | <img src="screenshots/12-grafo.png" alt="Grafo con activos y hallazgo"> |
+| <img src="screenshots/05-grafo-sin-datos.jpg" alt="Proyecto recién creado sin descubrimientos"> | <img src="screenshots/12-grafo.jpg" alt="Grafo con activos y hallazgo"> |
 
 Y el detalle de un nodo concreto:
 
-<img src="screenshots/13-grafo-nodo.png" alt="Panel de detalle del nodo seleccionado">
+<img src="screenshots/13-grafo-nodo.jpg" alt="Panel de detalle del nodo seleccionado">
 
 > El grafo se renderiza en la vista **Timeline**, que es la que monta el motor de grafo con
 > dimensiones correctas. Ver [Limitaciones conocidas](#limitaciones-conocidas).
@@ -102,19 +102,19 @@ Y el detalle de un nodo concreto:
 
 | Evidencia sin archivos | Evidencia del proyecto |
 |---|---|
-| <img src="screenshots/07-evidencia-vacia.png" alt="Pestaña Evidence vacía"> | <img src="screenshots/14-evidencia.png" alt="Pestaña Evidence"> |
+| <img src="screenshots/07-evidencia-vacia.jpg" alt="Pestaña Evidence vacía"> | <img src="screenshots/14-evidencia.jpg" alt="Pestaña Evidence"> |
 
 | Reportes sin generar | Asistente de IA |
 |---|---|
-| <img src="screenshots/08-reportes-vacio.png" alt="Pestaña Reports vacía"> | <img src="screenshots/15-assistant.png" alt="Pestaña Assistant"> |
+| <img src="screenshots/08-reportes-vacio.jpg" alt="Pestaña Reports vacía"> | <img src="screenshots/15-assistant.jpg" alt="Pestaña Assistant"> |
 
 El alcance autorizado del proyecto se gestiona desde la pestaña de ajustes:
 
-<img src="screenshots/16-settings-scope.png" alt="Pestaña Settings con el scope del proyecto">
+<img src="screenshots/16-settings-scope.jpg" alt="Pestaña Settings con el scope del proyecto">
 
 Y el constructor de reportes permite seleccionar los nodos del grafo que se incluirán:
 
-<img src="screenshots/17-report-builder.png" alt="Constructor de reportes">
+<img src="screenshots/17-report-builder.jpg" alt="Constructor de reportes">
 
 ---
 
